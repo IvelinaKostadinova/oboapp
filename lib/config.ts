@@ -5,7 +5,7 @@
 export type GeocodingAlgorithm = "google_geocoding" | "google_directions";
 
 // Configuration: Choose which geocoding algorithm to use
-export const GEOCODING_ALGO: GeocodingAlgorithm = "google_directions";
+export const GEOCODING_ALGO: GeocodingAlgorithm = "google_geocoding";
 
 // Log the active configuration
 console.log(`🗺️ Geocoding Algorithm: ${GEOCODING_ALGO}`);
