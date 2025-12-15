@@ -9,6 +9,16 @@ import {
   IntersectionCoordinates,
 } from "./types";
 
+// Constants for API rate limiting
+const GEOCODING_DELAY_MS = 100;
+const STREET_CLOSURE_DELAY_MS = 200;
+const GEOCODING_BATCH_DELAY_MS = 200;
+
+// Constants for street buffer widths (in meters)
+const BUFFER_WIDTH_BOULEVARD = 13; // 12-14m average
+const BUFFER_WIDTH_AVENUE = 9; // 8-10m average
+const BUFFER_WIDTH_RESIDENTIAL = 7; // 6-8m average
+
 // Cache for geocoding results and intersection lookups
 const geocodingCache = new Map<string, IntersectionCoordinates | null>();
 const intersectionCache = new Map<string, IntersectionCoordinates | null>();
@@ -43,14 +53,14 @@ export function normalizeAddress(address: string): string {
 
 // Step 2 — PIN / Address Geocoding (Points)
 async function geocodePin(
-  pin: string,
+  pin: { address: string; timespans: { start: string; end: string }[] },
   preGeocodedAddresses?: Map<string, IntersectionCoordinates>
 ): Promise<GeoJSONFeature | null> {
-  const normalizedPin = normalizeAddress(pin);
+  const normalizedPin = normalizeAddress(pin.address);
 
   // Check if we have a pre-geocoded address first
-  if (preGeocodedAddresses?.has(pin)) {
-    const coords = preGeocodedAddresses.get(pin)!;
+  if (preGeocodedAddresses?.has(pin.address)) {
+    const coords = preGeocodedAddresses.get(pin.address)!;
     return {
       type: "Feature",
       geometry: {
@@ -59,9 +69,11 @@ async function geocodePin(
       },
       properties: {
         feature_type: "pin",
-        original_text: pin,
+        original_text: pin.address,
         normalized_text: normalizedPin,
         is_intersection: normalizedPin.includes("and"),
+        start_time: pin.timespans[0]?.start || "",
+        end_time: pin.timespans[0]?.end || "",
       },
     };
   }
@@ -79,9 +91,11 @@ async function geocodePin(
       },
       properties: {
         feature_type: "pin",
-        original_text: pin,
+        original_text: pin.address,
         normalized_text: normalizedPin,
         is_intersection: normalizedPin.includes("and"),
+        start_time: pin.timespans[0]?.start || "",
+        end_time: pin.timespans[0]?.end || "",
       },
     };
   }
@@ -127,10 +141,12 @@ async function geocodePin(
         },
         properties: {
           feature_type: "pin",
-          original_text: pin,
+          original_text: pin.address,
           normalized_text: normalizedPin,
           formatted_address: result.formatted_address,
           is_intersection: normalizedPin.includes("and"),
+          start_time: pin.timespans[0]?.start || "",
+          end_time: pin.timespans[0]?.end || "",
         },
       };
     }
@@ -612,38 +628,55 @@ function getBufferWidth(streetName: string): number {
   const lowerStreet = streetName.toLowerCase();
 
   if (lowerStreet.includes("boulevard") || lowerStreet.includes("булевард")) {
-    return 13; // 12-14m average
+    return BUFFER_WIDTH_BOULEVARD;
   } else if (
     lowerStreet.includes("avenue") ||
     lowerStreet.includes("проспект") ||
     lowerStreet.includes("collector")
   ) {
-    return 9; // 8-10m average
+    return BUFFER_WIDTH_AVENUE;
   } else {
-    return 7; // 6-8m average for residential
+    return BUFFER_WIDTH_RESIDENTIAL;
   }
 }
 
 // Step 6 — Closure Feature Assembly
 async function createClosureFeature(
   street: StreetSection,
-  timespan: { start: string; end: string }[]
+  preGeocodedAddresses?: Map<string, IntersectionCoordinates>
 ): Promise<GeoJSONFeature | null> {
   try {
     // Step 3: Resolve endpoints
     // The from/to fields now contain either intersections (e.g., "Street A & Street B")
     // or specific addresses (e.g., "Street A №12")
-    const startCoords = await geocodeAddressOrIntersection(street.from);
-    const endCoords = await geocodeAddressOrIntersection(street.to);
+
+    // Check pre-geocoded addresses first
+    let startCoords: IntersectionCoordinates | null = null;
+    let endCoords: IntersectionCoordinates | null = null;
+
+    if (preGeocodedAddresses?.has(street.from)) {
+      startCoords = preGeocodedAddresses.get(street.from)!;
+      console.log(`Using pre-geocoded start coords for "${street.from}"`);
+    } else {
+      startCoords = await geocodeAddressOrIntersection(street.from);
+      // Add small delay to respect API quotas when geocoding
+      await new Promise((resolve) => setTimeout(resolve, GEOCODING_DELAY_MS));
+    }
+
+    if (preGeocodedAddresses?.has(street.to)) {
+      endCoords = preGeocodedAddresses.get(street.to)!;
+      console.log(`Using pre-geocoded end coords for "${street.to}"`);
+    } else {
+      endCoords = await geocodeAddressOrIntersection(street.to);
+      // Add small delay to respect API quotas when geocoding
+      await new Promise((resolve) => setTimeout(resolve, GEOCODING_DELAY_MS));
+    }
 
     if (!startCoords || !endCoords) {
       console.error("Failed to resolve endpoints for:", street);
       // Return null instead of invalid geometry
       return null;
     }
-
-    // Add small delay to respect API quotas
-    await new Promise((resolve) => setTimeout(resolve, 100));
 
     // Step 4: Get centerline
     const centerline = await getStreetCenterline(startCoords, endCoords);
@@ -672,8 +705,8 @@ async function createClosureFeature(
         street: street.street,
         from: street.from,
         to: street.to,
-        start_time: timespan[0]?.start || "",
-        end_time: timespan[0]?.end || "",
+        start_time: street.timespans[0]?.start || "",
+        end_time: street.timespans[0]?.end || "",
       },
     };
   } catch (error) {
@@ -697,20 +730,26 @@ export async function convertToGeoJSON(
       features.push(feature);
     }
     // Add delay only if we're actually geocoding (not using pre-geocoded data)
-    if (!preGeocodedAddresses?.has(pin)) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
+    if (!preGeocodedAddresses?.has(pin.address)) {
+      await new Promise((resolve) => setTimeout(resolve, GEOCODING_DELAY_MS));
     }
   }
 
   // Process all street closures
   console.log("Processing street closures:", extractedData.streets.length);
   for (const street of extractedData.streets) {
-    const feature = await createClosureFeature(street, extractedData.timespan);
+    const feature = await createClosureFeature(street, preGeocodedAddresses);
     if (feature) {
       features.push(feature);
     }
-    // Add delay to respect API quotas
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    // Only add delay if we're actually geocoding (not using pre-geocoded data)
+    const hasPreGeocodedFrom = preGeocodedAddresses?.has(street.from);
+    const hasPreGeocodedTo = preGeocodedAddresses?.has(street.to);
+    if (!hasPreGeocodedFrom || !hasPreGeocodedTo) {
+      await new Promise((resolve) =>
+        setTimeout(resolve, STREET_CLOSURE_DELAY_MS)
+      );
+    }
   }
 
   console.log("Total features created:", features.length);

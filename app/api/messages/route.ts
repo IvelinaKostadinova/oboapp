@@ -93,18 +93,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Extract structured data using Google AI
+    // Step 1: Extract structured data using Google AI (pins and street sections)
     const extractedData = await extractAddresses(text);
 
-    // Get all address texts from pins array for geocoding
-    const addressTexts = extractedData?.pins || [];
+    // Step 2: Collect all unique addresses that need geocoding
+    const addressesToGeocode = new Set<string>();
 
-    // Geocode the extracted addresses
-    const addresses = await geocodeAddresses(addressTexts);
-    console.log("Geocoded addresses:", addresses);
+    if (extractedData) {
+      // Add pin addresses
+      extractedData.pins.forEach((pin) => {
+        addressesToGeocode.add(pin.address);
+      });
 
-    // Convert to GeoJSON if we have extracted data
-    // Pass the geocoded addresses to avoid duplicate geocoding
+      // Add street endpoint addresses (from and to)
+      extractedData.streets.forEach((street) => {
+        addressesToGeocode.add(street.from);
+        addressesToGeocode.add(street.to);
+      });
+    }
+
+    console.log(
+      `Collected ${addressesToGeocode.size} unique addresses to geocode`
+    );
+
+    // Step 3: Geocode all addresses in one batch
+    const addresses = await geocodeAddresses(Array.from(addressesToGeocode));
+    console.log(
+      `Successfully geocoded ${addresses.length}/${addressesToGeocode.size} addresses`
+    );
+
+    // Step 4: Convert to GeoJSON using pre-geocoded addresses
     let geoJson = undefined;
     if (extractedData) {
       try {
@@ -116,7 +134,9 @@ export async function POST(request: NextRequest) {
           ])
         );
         geoJson = await convertToGeoJSON(extractedData, geocodedMap);
-        console.log("Generated GeoJSON:", geoJson);
+        console.log(
+          `Generated GeoJSON with ${geoJson.features.length} features`
+        );
       } catch (error) {
         console.error("Error converting to GeoJSON:", error);
         // Continue without GeoJSON if conversion fails

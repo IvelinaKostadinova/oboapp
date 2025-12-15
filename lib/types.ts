@@ -15,15 +15,9 @@ export interface Address {
     lng: number;
   };
   geoJson?: {
-    type: 'Point';
+    type: "Point";
     coordinates: [number, number]; // [longitude, latitude]
   };
-}
-
-export interface StreetSection {
-  street: string;
-  from: string;
-  to: string;
 }
 
 export interface Timespan {
@@ -31,39 +25,50 @@ export interface Timespan {
   end: string;
 }
 
+export interface Pin {
+  address: string;
+  timespans: Timespan[];
+}
+
+export interface StreetSection {
+  street: string;
+  from: string;
+  to: string;
+  timespans: Timespan[];
+}
+
 export interface ExtractedData {
   responsible_entity: string;
-  pins: string[];
+  pins: Pin[];
   streets: StreetSection[];
-  timespan: Timespan[];
 }
 
 // GeoJSON Types
 export type GeoJSONGeometry = GeoJSONPoint | GeoJSONLineString | GeoJSONPolygon;
 
 export interface GeoJSONPoint {
-  type: 'Point';
+  type: "Point";
   coordinates: [number, number]; // [longitude, latitude]
 }
 
 export interface GeoJSONLineString {
-  type: 'LineString';
+  type: "LineString";
   coordinates: [number, number][]; // array of [longitude, latitude]
 }
 
 export interface GeoJSONPolygon {
-  type: 'Polygon';
+  type: "Polygon";
   coordinates: [number, number][][]; // array of rings, each ring is array of [longitude, latitude]
 }
 
 export interface GeoJSONFeature {
-  type: 'Feature';
+  type: "Feature";
   geometry: GeoJSONGeometry;
   properties: Record<string, any>;
 }
 
 export interface GeoJSONFeatureCollection {
-  type: 'FeatureCollection';
+  type: "FeatureCollection";
   features: GeoJSONFeature[];
 }
 

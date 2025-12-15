@@ -6,9 +6,9 @@ import { ExtractedData } from "./types";
 const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_AI_API_KEY || "" });
 
 // Read the prompt template once at module load time
-let promptTemplate: string;
+let systemInstruction: string;
 try {
-  promptTemplate = readFileSync(
+  systemInstruction = readFileSync(
     join(process.cwd(), "lib", "prompts", "data-extraction.md"),
     "utf-8"
   );
@@ -38,22 +38,23 @@ export async function extractAddresses(
     // Sanitize input to prevent prompt injection
     const sanitizedText = text.replace(/[\n\r]/g, " ").trim();
 
-    // Construct the prompt by appending the sanitized message to the template
-    const prompt = promptTemplate + sanitizedText;
-    console.log("Prompt: " + prompt);
-
     // Validate required environment variable
     const model = process.env.GOOGLE_AI_MODEL;
     if (!model) {
       console.error("GOOGLE_AI_MODEL environment variable is not set");
       return null;
     }
-    console.log(model);
+    console.log("systemInstruction:", systemInstruction);
+    console.log("sanitizedText:", sanitizedText);
+    console.log("model:", model);
 
     // Make request to Gemini API
     const response = await ai.models.generateContent({
       model: model,
-      contents: prompt,
+      contents: sanitizedText,
+      config: {
+        systemInstruction,
+      },
     });
     const responseText = response.text || "";
 
@@ -68,32 +69,51 @@ export async function extractAddresses(
 
         // Validate and filter pins array
         const validPins = Array.isArray(parsedResponse.pins)
-          ? parsedResponse.pins.filter(
-              (addr: any) => typeof addr === "string" && addr.trim().length > 0
-            )
+          ? parsedResponse.pins
+              .filter(
+                (pin: any) =>
+                  pin &&
+                  typeof pin === "object" &&
+                  typeof pin.address === "string" &&
+                  pin.address.trim().length > 0 &&
+                  Array.isArray(pin.timespans)
+              )
+              .map((pin: any) => ({
+                address: pin.address,
+                timespans: pin.timespans.filter(
+                  (time: any) =>
+                    time &&
+                    typeof time === "object" &&
+                    typeof time.start === "string" &&
+                    typeof time.end === "string"
+                ),
+              }))
           : [];
 
         // Validate and filter streets array
         const validStreets = Array.isArray(parsedResponse.streets)
-          ? parsedResponse.streets.filter(
-              (street: any) =>
-                street &&
-                typeof street === "object" &&
-                typeof street.street === "string" &&
-                typeof street.from === "string" &&
-                typeof street.to === "string"
-            )
-          : [];
-
-        // Validate and filter timespan array
-        const validTimespan = Array.isArray(parsedResponse.timespan)
-          ? parsedResponse.timespan.filter(
-              (time: any) =>
-                time &&
-                typeof time === "object" &&
-                typeof time.start === "string" &&
-                typeof time.end === "string"
-            )
+          ? parsedResponse.streets
+              .filter(
+                (street: any) =>
+                  street &&
+                  typeof street === "object" &&
+                  typeof street.street === "string" &&
+                  typeof street.from === "string" &&
+                  typeof street.to === "string" &&
+                  Array.isArray(street.timespans)
+              )
+              .map((street: any) => ({
+                street: street.street,
+                from: street.from,
+                to: street.to,
+                timespans: street.timespans.filter(
+                  (time: any) =>
+                    time &&
+                    typeof time === "object" &&
+                    typeof time.start === "string" &&
+                    typeof time.end === "string"
+                ),
+              }))
           : [];
 
         // Return the full structured data
@@ -101,7 +121,6 @@ export async function extractAddresses(
           responsible_entity: parsedResponse.responsible_entity || "",
           pins: validPins,
           streets: validStreets,
-          timespan: validTimespan,
         };
 
         return extractedData;
