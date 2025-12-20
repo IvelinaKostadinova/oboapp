@@ -45,11 +45,19 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Copyright */}
+        {/* Footer Text */}
         <div className="mt-8 pt-6 border-t border-gray-300 text-center text-sm text-gray-600">
           <p>
-            2018 - {new Date().getFullYear()} © Столична община - Район
-            "Оборище". Всички права запазени.
+            Разработено в Оборище с ❤️ за Оборище. Виж{" "}
+            <a
+              href="https://github.com/vbuch/oborishte-map"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#5DADE2] hover:underline"
+            >
+              отворения код в GitHub
+            </a>
+            .
           </p>
         </div>
       </div>

@@ -5,7 +5,6 @@ import { LoadScript } from "@react-google-maps/api";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import MessageModal from "@/components/MessageModal";
-import GitHubCorner from "@/components/GitHubCorner";
 import { AuthProvider } from "@/lib/auth-context";
 
 export default function ClientLayout({
@@ -30,7 +29,6 @@ export default function ClientLayout({
 
   return (
     <div className="antialiased flex flex-col h-screen overflow-hidden">
-      <GitHubCorner />
       <LoadScript
         googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ""}
       >
