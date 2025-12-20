@@ -28,13 +28,6 @@ export default function ClientLayout({
     globalThis.dispatchEvent(new CustomEvent("messageSubmitted"));
   };
 
-  const handleAddInterest = () => {
-    // Call the global function set by HomeContent
-    if ((globalThis as any).__startAddInterest) {
-      (globalThis as any).__startAddInterest();
-    }
-  };
-
   return (
     <div className="antialiased flex flex-col h-screen overflow-hidden">
       <GitHubCorner />
@@ -42,10 +35,7 @@ export default function ClientLayout({
         googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ""}
       >
         <AuthProvider>
-          <Header
-            onOpenMessageModal={handleOpenMessageModal}
-            onAddInterest={handleAddInterest}
-          />
+          <Header onOpenMessageModal={handleOpenMessageModal} />
           <div className="flex-1 flex flex-col overflow-y-auto">
             <main className="flex-1 flex flex-col">{children}</main>
             <Footer />

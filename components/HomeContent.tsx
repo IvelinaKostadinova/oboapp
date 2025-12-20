@@ -13,13 +13,7 @@ import { useInterests } from "@/lib/hooks/useInterests";
 import { useNotificationPrompt } from "@/lib/hooks/useNotificationPrompt";
 import { useAuth } from "@/lib/auth-context";
 
-interface HomeContentProps {
-  readonly onAddInterestRequest?: () => void;
-}
-
-export default function HomeContent({
-  onAddInterestRequest,
-}: HomeContentProps) {
+export default function HomeContent() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -260,12 +254,7 @@ export default function HomeContent({
       initialRadius: 500,
       editingInterestId: null,
     });
-
-    // Notify parent if callback provided
-    if (onAddInterestRequest) {
-      onAddInterestRequest();
-    }
-  }, [onAddInterestRequest]);
+  }, []);
 
   const handleSaveInterest = useCallback(
     (coordinates: { lat: number; lng: number }, radius: number) => {
@@ -301,15 +290,6 @@ export default function HomeContent({
     setInterestMenuPosition(null);
     setSelectedInterest(null);
   }, []);
-
-  // Expose handleStartAddInterest to parent via effect
-  useEffect(() => {
-    // Store in global for Header to access
-    (globalThis as any).__startAddInterest = handleStartAddInterest;
-    return () => {
-      delete (globalThis as any).__startAddInterest;
-    };
-  }, [handleStartAddInterest]);
 
   return (
     <div className="flex-1 flex flex-col" ref={containerRef}>
