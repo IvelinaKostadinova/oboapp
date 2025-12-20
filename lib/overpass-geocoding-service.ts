@@ -118,20 +118,6 @@ async function getStreetGeometryFromOverpass(
       `✅ Found ${lineStrings.length} way segments with ${totalPoints} total points for: ${streetName}`
     );
 
-    // Show ALL segment ranges for debugging disconnected streets
-    console.log(`   All ${lineStrings.length} segment coordinate ranges:`);
-    lineStrings.forEach((coords, i) => {
-      const first = coords[0];
-      const last = coords[coords.length - 1];
-      console.log(
-        `   ${i + 1}. [${first[1].toFixed(6)}, ${first[0].toFixed(
-          6
-        )}] → [${last[1].toFixed(6)}, ${last[0].toFixed(6)}] (${
-          coords.length
-        } pts)`
-      );
-    });
-
     const multiLineString: Feature<MultiLineString> = {
       type: "Feature",
       properties: { name: streetName },
