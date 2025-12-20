@@ -6,6 +6,10 @@ import {
   validateMessageText,
   messageIngest,
 } from "@/lib/messageIngest";
+import {
+  loadOborichteBoundary,
+  isWithinBoundaries,
+} from "@/lib/boundary-utils";
 
 const INGEST_SOURCE = "web-interface";
 const DEFAULT_RELEVANCE_DAYS = 7;
@@ -118,9 +122,22 @@ export async function GET() {
     });
 
     // Filter messages by relevance
-    const messages = allMessages.filter((message) =>
+    const relevantMessages = allMessages.filter((message) =>
       isMessageRelevant(message, cutoffDate)
     );
+
+    // Filter messages by Oborishte boundary
+    const boundary = loadOborichteBoundary();
+    const messages = relevantMessages.filter((message) => {
+      if (!message.geoJson) {
+        return false; // Exclude messages without GeoJSON
+      }
+      const geoJson =
+        typeof message.geoJson === "string"
+          ? JSON.parse(message.geoJson)
+          : message.geoJson;
+      return isWithinBoundaries(geoJson, boundary);
+    });
 
     return NextResponse.json({ messages });
   } catch (error) {

@@ -2,10 +2,9 @@
 
 import * as dotenv from "dotenv";
 import { resolve } from "node:path";
-import { readFileSync } from "node:fs";
 import type { Firestore } from "firebase-admin/firestore";
 import { GeoJSONFeatureCollection } from "../types";
-import * as turf from "@turf/turf";
+import { loadBoundaries, isWithinBoundaries } from "../boundary-utils";
 
 // Load environment variables
 dotenv.config({ path: resolve(process.cwd(), ".env.local") });
@@ -57,137 +56,6 @@ async function parseArguments(): Promise<IngestOptions> {
   }
 
   return options;
-}
-
-function loadBoundaries(
-  boundariesPath?: string
-): GeoJSONFeatureCollection | null {
-  if (!boundariesPath) {
-    console.log("ℹ️  No boundaries specified, processing all sources");
-    return null;
-  }
-
-  try {
-    const absolutePath = resolve(process.cwd(), boundariesPath);
-    const content = readFileSync(absolutePath, "utf-8");
-    const geojson = JSON.parse(content) as GeoJSONFeatureCollection;
-
-    console.log(`✅ Loaded boundaries from: ${absolutePath}`);
-    console.log(`   Features: ${geojson.features.length}`);
-
-    return geojson;
-  } catch (error) {
-    console.error(
-      `❌ Failed to load boundaries from ${boundariesPath}:`,
-      error
-    );
-    throw error;
-  }
-}
-
-function isWithinBoundaries(
-  sourceGeoJson: GeoJSONFeatureCollection,
-  boundaries: GeoJSONFeatureCollection
-): boolean {
-  try {
-    // Check if any feature in source intersects with boundaries
-    for (const feature of sourceGeoJson.features) {
-      if (!feature.geometry?.coordinates) {
-        console.warn("⚠️  Skipping feature without valid geometry");
-        continue;
-      }
-
-      if (checkFeatureIntersection(feature, boundaries)) {
-        return true;
-      }
-    }
-
-    return false;
-  } catch (error) {
-    console.warn("⚠️  Error checking boundaries intersection:", error);
-    // In case of error, include the source to be safe
-    return true;
-  }
-}
-
-function checkFeatureIntersection(
-  feature: any,
-  boundaries: GeoJSONFeatureCollection
-): boolean {
-  const turfFeature = turf.feature(feature.geometry, feature.properties);
-
-  for (const boundaryFeature of boundaries.features) {
-    const turfBoundary = turf.feature(
-      boundaryFeature.geometry,
-      boundaryFeature.properties
-    );
-
-    try {
-      // Check if geometries intersect
-      if (
-        turf.booleanIntersects(turfFeature, turfBoundary) ||
-        turf.booleanWithin(turfFeature, turfBoundary) ||
-        turf.booleanContains(turfBoundary, turfFeature)
-      ) {
-        return true;
-      }
-    } catch (intersectError) {
-      // Some geometry types might not support all comparison operations
-      // Try a simpler bounding box check instead
-      if (
-        checkBoundingBoxOverlap(
-          turfFeature,
-          turfBoundary,
-          feature.geometry.type,
-          intersectError
-        )
-      ) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
-
-function checkBoundingBoxOverlap(
-  turfFeature: any,
-  turfBoundary: any,
-  geometryType: string,
-  originalError: unknown
-): boolean {
-  try {
-    const featureBbox = turf.bbox(turfFeature);
-    const boundaryBbox = turf.bbox(turfBoundary);
-
-    // Check if bounding boxes overlap
-    const overlaps = !(
-      (
-        featureBbox[2] < boundaryBbox[0] || // feature is completely to the left
-        featureBbox[0] > boundaryBbox[2] || // feature is completely to the right
-        featureBbox[3] < boundaryBbox[1] || // feature is completely below
-        featureBbox[1] > boundaryBbox[3]
-      ) // feature is completely above
-    );
-
-    if (overlaps) {
-      console.log(`ℹ️  Using bounding box check for ${geometryType} geometry`);
-      return true;
-    }
-
-    return false;
-  } catch (error) {
-    const errorMessage =
-      originalError instanceof Error
-        ? originalError.message
-        : String(originalError);
-    const bboxErrorMessage =
-      error instanceof Error ? error.message : String(error);
-    console.warn(
-      `⚠️  Could not check geometry intersection (${errorMessage}), bbox check also failed (${bboxErrorMessage}), including by default`
-    );
-    return true;
-  }
 }
 
 async function fetchSources(
