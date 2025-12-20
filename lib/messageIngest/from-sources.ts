@@ -330,7 +330,9 @@ async function maybeInitFirestore(): Promise<Firestore> {
   return firebase.adminDb;
 }
 
-export async function ingest(options: IngestOptions = {}): Promise<IngestSummary> {
+export async function ingest(
+  options: IngestOptions = {}
+): Promise<IngestSummary> {
   console.log("📥 Starting source ingestion...\n");
   console.log(
     `🔧 Mode: ${options.dryRun ? "dry-run (no ingestion)" : "production"}`
@@ -428,5 +430,4 @@ if (require.main === module) {
     console.error("❌ Ingestion failed:", error);
     process.exit(1);
   });
-}rocess.exit(1);
-});
+}
