@@ -54,9 +54,6 @@ export default function Header({ onOpenMessageModal }: HeaderProps) {
                         className="w-8 h-8 rounded-full"
                       />
                     )}
-                    <span className="text-sm text-white hidden sm:inline">
-                      {user.displayName || user.email}
-                    </span>
                   </div>
                   {user.email === "valery.buchinsky@gmail.com" && (
                     <button
