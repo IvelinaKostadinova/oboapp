@@ -8,7 +8,7 @@ import { SourceDocument, PostLink } from "./types";
 import { SELECTORS } from "./selectors";
 import { launchBrowser } from "../shared/browser";
 import { createTurndownService } from "../shared/markdown";
-import { delay } from "../shared/rate-limiting";
+import { delay } from "../../delay";
 import { isUrlProcessed, saveSourceDocument } from "../shared/firestore";
 import { parseBulgarianDate } from "../shared/date-utils";
 

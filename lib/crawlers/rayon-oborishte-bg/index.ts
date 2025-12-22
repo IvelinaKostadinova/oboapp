@@ -7,7 +7,7 @@ import type { Firestore } from "firebase-admin/firestore";
 import { SourceDocument, PostLink } from "./types";
 import { launchBrowser } from "../shared/browser";
 import { createTurndownService } from "../shared/markdown";
-import { delay } from "../shared/rate-limiting";
+import { delay } from "../../delay";
 import { isUrlProcessed, saveSourceDocument } from "../shared/firestore";
 import { parseBulgarianDate } from "../shared/date-utils";
 

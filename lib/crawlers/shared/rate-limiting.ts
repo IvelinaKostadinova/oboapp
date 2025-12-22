@@ -1,9 +1,4 @@
-/**
- * Wait for specified milliseconds
- */
-export function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+import { delay } from "../../delay";
 
 /**
  * Rate limiter class to throttle requests
