@@ -183,6 +183,18 @@ async function filterByBoundaries(
         ? (JSON.parse(source.geoJson) as GeoJSONFeatureCollection)
         : source.geoJson;
 
+    // Validate GeoJSON structure
+    if (
+      !geoJson ||
+      typeof geoJson !== "object" ||
+      !Array.isArray(geoJson.features)
+    ) {
+      console.warn(`   ⚠️  Invalid GeoJSON for source: ${source.url}`);
+      // Include sources with invalid GeoJSON to avoid skipping them
+      withinBounds.push(source);
+      continue;
+    }
+
     if (isWithinBoundaries(geoJson, boundaries)) {
       withinBounds.push(source);
     } else {
