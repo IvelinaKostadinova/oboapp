@@ -8,15 +8,22 @@ export async function storeIncomingMessage(
   text: string,
   userId: string,
   userEmail: string | null,
-  source: string = "web-interface"
+  source: string = "web-interface",
+  sourceUrl?: string
 ): Promise<string> {
   const messagesRef = adminDb.collection("messages");
-  const docRef = await messagesRef.add({
+  const docData: any = {
     text,
     userId,
     userEmail,
     source,
     createdAt: FieldValue.serverTimestamp(),
-  });
+  };
+
+  if (sourceUrl) {
+    docData.sourceUrl = sourceUrl;
+  }
+
+  const docRef = await messagesRef.add(docData);
   return docRef.id;
 }

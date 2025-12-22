@@ -26,6 +26,10 @@ export interface MessageIngestOptions {
    * Used by crawlers or integrations with pre-geocoded data.
    */
   precomputedGeoJson?: GeoJSONFeatureCollection | null;
+  /**
+   * Optional source URL for the message (e.g., original article URL)
+   */
+  sourceUrl?: string;
 }
 
 /**
@@ -44,7 +48,13 @@ export async function messageIngest(
   options: MessageIngestOptions = {}
 ): Promise<Message> {
   // Step 1: Store incoming message
-  const messageId = await storeIncomingMessage(text, userId, userEmail, source);
+  const messageId = await storeIncomingMessage(
+    text,
+    userId,
+    userEmail,
+    source,
+    options.sourceUrl
+  );
 
   const hasPrecomputedGeoJson = Boolean(options.precomputedGeoJson);
   let extractedData: ExtractedData | null = null;

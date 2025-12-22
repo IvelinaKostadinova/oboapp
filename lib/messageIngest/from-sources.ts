@@ -103,7 +103,7 @@ async function isAlreadyIngested(
   // Check if a message already exists for this source URL
   const messagesSnapshot = await adminDb
     .collection("messages")
-    .where("source", "==", sourceUrl)
+    .where("sourceUrl", "==", sourceUrl)
     .limit(1)
     .get();
 
@@ -140,14 +140,15 @@ async function ingestSource(
   // Dynamically import messageIngest to avoid loading firebase-admin at startup
   const { messageIngest } = await import("./index");
 
-  // Use the source URL as the source identifier for messageIngest
+  // Use the sourceType as the source identifier for messageIngest
   await messageIngest(
     source.message,
-    source.url,
+    source.sourceType,
     SYSTEM_USER_ID,
     SYSTEM_USER_EMAIL,
     {
       precomputedGeoJson: geoJson,
+      sourceUrl: source.url,
     }
   );
 

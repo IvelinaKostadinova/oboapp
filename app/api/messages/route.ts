@@ -118,6 +118,8 @@ export async function GET() {
           : undefined,
         geoJson: data.geoJson ? JSON.parse(data.geoJson) : undefined,
         createdAt: convertTimestamp(data.createdAt),
+        source: data.source,
+        sourceUrl: data.sourceUrl,
       });
     });
 

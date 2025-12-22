@@ -6,6 +6,7 @@ export interface Message {
   geoJson?: GeoJSONFeatureCollection;
   createdAt: Date | string;
   source?: string;
+  sourceUrl?: string;
 }
 
 export interface Address {
