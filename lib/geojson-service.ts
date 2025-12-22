@@ -38,6 +38,7 @@ function createPinFeature(
       address: pin.address,
       start_time: pin.timespans[0]?.start || "",
       end_time: pin.timespans[0]?.end || "",
+      timespans: JSON.stringify(pin.timespans), // Store all timespans as JSON string
     },
   };
 }
@@ -224,6 +225,7 @@ async function createClosureFeature(
       to: street.to,
       start_time: street.timespans[0]?.start || "",
       end_time: street.timespans[0]?.end || "",
+      timespans: JSON.stringify(street.timespans), // Store all timespans as JSON string
     },
   };
 }
