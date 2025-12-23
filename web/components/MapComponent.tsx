@@ -36,6 +36,14 @@ const OBORISHTE_CENTER = {
   lng: 23.3341,
 };
 
+// Oborishte District bounds (calculated from oborishte.geojson)
+const OBORISHTE_BOUNDS = {
+  north: 42.72,
+  south: 42.68,
+  east: 23.37,
+  west: 23.31,
+};
+
 const mapContainerStyle = {
   width: "100%",
   height: "100%",
@@ -83,13 +91,19 @@ const mapStyles = [
 ];
 
 const mapOptions = {
-  zoom: 15,
+  zoom: 14,
   center: OBORISHTE_CENTER,
   mapTypeControl: true,
   streetViewControl: true,
   fullscreenControl: true,
   styles: mapStyles,
   clickableIcons: false, // Disable clicking on POIs (shops, hospitals, etc.)
+  restriction: {
+    latLngBounds: OBORISHTE_BOUNDS,
+    strictBounds: true,
+  },
+  minZoom: 12,
+  maxZoom: 18,
 };
 
 export default function MapComponent({

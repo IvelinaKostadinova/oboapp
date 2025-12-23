@@ -146,11 +146,7 @@ export function filterFeaturesByBoundaries(
   sourceGeoJson: GeoJSONFeatureCollection | null,
   boundaries: GeoJSONFeatureCollection
 ): GeoJSONFeatureCollection | null {
-  if (
-    !sourceGeoJson ||
-    !sourceGeoJson.features ||
-    sourceGeoJson.features.length === 0
-  ) {
+  if (!sourceGeoJson?.features || sourceGeoJson.features.length === 0) {
     return null;
   }
 
