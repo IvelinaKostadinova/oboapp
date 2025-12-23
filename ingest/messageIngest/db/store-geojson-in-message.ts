@@ -1,5 +1,6 @@
 import { adminDb } from "@/lib/firebase-admin";
 import { GeoJSONFeatureCollection } from "@/lib/types";
+import { FieldValue } from "firebase-admin/firestore";
 
 /**
  * Step 7: Store GeoJSON in the message
@@ -15,5 +16,6 @@ export async function storeGeoJsonInMessage(
   const messagesRef = adminDb.collection("messages");
   await messagesRef.doc(messageId).update({
     geoJson: JSON.stringify(geoJson),
+    finalizedAt: FieldValue.serverTimestamp(),
   });
 }

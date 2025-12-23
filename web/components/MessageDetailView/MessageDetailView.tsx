@@ -97,11 +97,13 @@ export default function MessageDetailView({
             isVisible ? "opacity-100" : "opacity-0"
           }`}
         >
-          <DetailItem title="Подаден">
-            <p className="text-base text-gray-900">
-              {formatDate(message.createdAt)}
-            </p>
-          </DetailItem>
+          {message.finalizedAt && (
+            <DetailItem title="Публикувано тук">
+              <p className="text-base text-gray-900">
+                {formatDate(message.finalizedAt)}
+              </p>
+            </DetailItem>
+          )}
 
           {message.source && (
             <SourceDisplay

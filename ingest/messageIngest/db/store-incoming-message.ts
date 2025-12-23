@@ -9,7 +9,8 @@ export async function storeIncomingMessage(
   userId: string,
   userEmail: string | null,
   source: string = "web-interface",
-  sourceUrl?: string
+  sourceUrl?: string,
+  crawledAt?: Date
 ): Promise<string> {
   const messagesRef = adminDb.collection("messages");
   const docData: any = {
@@ -18,6 +19,7 @@ export async function storeIncomingMessage(
     userEmail,
     source,
     createdAt: FieldValue.serverTimestamp(),
+    crawledAt: crawledAt || FieldValue.serverTimestamp(),
   };
 
   if (sourceUrl) {

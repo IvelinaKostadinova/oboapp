@@ -113,6 +113,12 @@ export async function GET() {
           : undefined,
         geoJson: data.geoJson ? JSON.parse(data.geoJson) : undefined,
         createdAt: convertTimestamp(data.createdAt),
+        crawledAt: data.crawledAt
+          ? convertTimestamp(data.crawledAt)
+          : undefined,
+        finalizedAt: data.finalizedAt
+          ? convertTimestamp(data.finalizedAt)
+          : undefined,
         source: data.source,
         sourceUrl: data.sourceUrl,
       });

@@ -36,6 +36,10 @@ export interface MessageIngestOptions {
    * If no features are within boundaries, the message is not stored
    */
   boundaryFilter?: GeoJSONFeatureCollection;
+  /**
+   * Optional crawledAt timestamp from the source document
+   */
+  crawledAt?: Date;
 }
 
 /**
@@ -59,7 +63,8 @@ export async function messageIngest(
     userId,
     userEmail,
     source,
-    options.sourceUrl
+    options.sourceUrl,
+    options.crawledAt
   );
 
   const hasPrecomputedGeoJson = Boolean(options.precomputedGeoJson);

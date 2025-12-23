@@ -159,6 +159,7 @@ async function ingestSource(
       precomputedGeoJson: geoJson,
       sourceUrl: source.url,
       boundaryFilter: boundaries ?? undefined,
+      crawledAt: source.crawledAt,
     }
   );
 

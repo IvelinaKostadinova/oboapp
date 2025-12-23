@@ -5,6 +5,8 @@ export interface Message {
   extractedData?: ExtractedData;
   geoJson?: GeoJSONFeatureCollection;
   createdAt: Date | string;
+  crawledAt?: Date | string;
+  finalizedAt?: Date | string;
   source?: string;
   sourceUrl?: string;
 }
