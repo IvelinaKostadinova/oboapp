@@ -44,12 +44,12 @@ variable "schedules" {
     notify                = string
   })
   default = {
-    crawl_rayon_oborishte = "0 6 * * *"  # Daily at 6:00 AM
-    crawl_sofia           = "0 7 * * *"  # Daily at 7:00 AM
-    crawl_sofiyska_voda   = "0 8 * * *"  # Daily at 8:00 AM
-    crawl_toplo           = "0 9 * * *"  # Daily at 9:00 AM
-    ingest                = "0 10 * * *" # Daily at 10:00 AM
-    notify                = "0 11 * * *" # Daily at 11:00 AM
+    crawl_rayon_oborishte = "0 10,14,16 * * *"   # 3x daily: 10:00, 14:00, 16:00
+    crawl_sofia           = "5 10,14,16 * * *"   # 3x daily: 10:05, 14:05, 16:05
+    crawl_sofiyska_voda   = "10 10,14,16 * * *"  # 3x daily: 10:10, 14:10, 16:10
+    crawl_toplo           = "15 10,14,16 * * *"  # 3x daily: 10:15, 14:15, 16:15
+    ingest                = "30 10,14,16 * * *"  # 3x daily: 10:30, 14:30, 16:30
+    notify                = "45 10,14,16 * * *"  # 3x daily: 10:45, 14:45, 16:45
   }
 }
 
