@@ -1,0 +1,51 @@
+{
+  "name": "oborishte-map-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:run": "vitest run",
+    "crawl:rayon-oborishte": "tsx lib/crawlers/rayon-oborishte-bg/index.ts",
+    "crawl:sofiyska-voda": "tsx lib/crawlers/sofiyska-voda/index.ts",
+    "crawl:toplo": "tsx lib/crawlers/toplo-bg/index.ts",
+    "crawl:sofia-bg": "tsx lib/crawlers/sofia-bg/index.ts",
+    "ingest": "tsx lib/messageIngest/from-sources.ts",
+    "notify": "tsx lib/notifications/match-and-notify.ts"
+  },
+  "dependencies": {
+    "@google/genai": "^1.33.0",
+    "@react-google-maps/api": "^2.20.7",
+    "@turf/turf": "^7.3.1",
+    "dotenv": "^17.2.3",
+    "firebase": "^12.6.0",
+    "firebase-admin": "^13.6.0",
+    "next": "16.0.10",
+    "react": "19.2.1",
+    "react-dom": "19.2.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.1",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/turndown": "^5.0.6",
+    "@vitejs/plugin-react": "^5.1.2",
+    "@vitest/coverage-v8": "^4.0.15",
+    "@vitest/ui": "^4.0.15",
+    "eslint": "*",
+    "eslint-config-next": "^16.0.10",
+    "happy-dom": "^20.0.11",
+    "playwright": "^1.57.0",
+    "tailwindcss": "^4",
+    "tsx": "^4.21.0",
+    "turndown": "^7.2.2",
+    "typescript": "^5",
+    "vitest": "^4.0.15"
+  }
+}

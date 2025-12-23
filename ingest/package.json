@@ -1,0 +1,33 @@
+{
+  "name": "oborishte-map-ingest",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "test": "vitest",
+    "crawl": "tsx crawl",
+    "ingest": "tsx ingest",
+    "notify": "tsx notify"
+  },
+  "dependencies": {
+    "@google/genai": "^1.33.0",
+    "@react-google-maps/api": "^2.20.7",
+    "@turf/turf": "^7.3.1",
+    "commander": "^14.0.2",
+    "dotenv": "^17.2.3",
+    "firebase": "^12.6.0",
+    "firebase-admin": "^13.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/turndown": "^5.0.6",
+    "@vitest/coverage-v8": "^4.0.15",
+    "eslint": "*",
+    "eslint-config-next": "^16.0.10",
+    "happy-dom": "^20.0.11",
+    "playwright": "^1.57.0",
+    "tsx": "^4.21.0",
+    "turndown": "^7.2.2",
+    "typescript": "^5",
+    "vitest": "^4.0.15"
+  }
+}
