@@ -93,9 +93,9 @@ const mapStyles = [
 const mapOptions = {
   zoom: 14,
   center: OBORISHTE_CENTER,
-  mapTypeControl: true,
-  streetViewControl: true,
-  fullscreenControl: true,
+  mapTypeControl: false,
+  streetViewControl: false,
+  fullscreenControl: false,
   styles: mapStyles,
   clickableIcons: false, // Disable clicking on POIs (shops, hospitals, etc.)
   restriction: {
