@@ -8,11 +8,11 @@ terraform {
     }
   }
 
-  # Uncomment to use remote state (recommended for team collaboration)
-  # backend "gcs" {
-  #   bucket = "your-terraform-state-bucket"
-  #   prefix = "oborishte-ingest"
-  # }
+  # Recommended: Store state in GCS for team collaboration and CI/CD
+  backend "gcs" {
+    bucket = "oborishte-map-terraform-state"
+    prefix = "oborishte-ingest"
+  }
 }
 
 provider "google" {
