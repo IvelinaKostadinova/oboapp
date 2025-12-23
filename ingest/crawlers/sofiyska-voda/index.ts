@@ -9,7 +9,7 @@ import {
   LayerConfig,
   SofiyskaVodaSourceDocument,
 } from "./types";
-import { GeoJSONFeature, GeoJSONFeatureCollection } from "../../types";
+import { GeoJSONFeature, GeoJSONFeatureCollection } from "@/lib/types";
 import {
   isUrlProcessed,
   saveSourceDocument as saveSourceDocumentShared,
@@ -342,16 +342,15 @@ async function saveSourceDocument(
   console.log(`✅ Записано събитие: ${doc.title}`);
 }
 
-export async function crawl(dryRun = false): Promise<void> {
+export async function crawl(): Promise<void> {
   console.log("🚰 Стартиране на crawler за Sofiyska Voda...\n");
-  console.log(`🔧 Режим: ${dryRun ? "dry-run (без запис)" : "производствен"}`);
 
   const summary: CrawlSummary = { saved: 0, skipped: 0, emptyLayers: 0 };
   const seenUrls = new Set<string>();
-  const adminDb = await maybeInitFirestore(dryRun);
+  const adminDb = await maybeInitFirestore();
 
   for (const layer of LAYERS) {
-    const layerSummary = await processLayer(layer, seenUrls, adminDb, dryRun);
+    const layerSummary = await processLayer(layer, seenUrls, adminDb);
     summary.saved += layerSummary.saved;
     summary.skipped += layerSummary.skipped;
     summary.emptyLayers += layerSummary.emptyLayers;
@@ -360,11 +359,7 @@ export async function crawl(dryRun = false): Promise<void> {
   logSummary(summary);
 }
 
-async function maybeInitFirestore(dryRun: boolean): Promise<Firestore | null> {
-  if (dryRun) {
-    return null;
-  }
-
+async function maybeInitFirestore(): Promise<Firestore | null> {
   const firebase = await import("@/lib/firebase-admin");
   return firebase.adminDb;
 }
@@ -372,8 +367,7 @@ async function maybeInitFirestore(dryRun: boolean): Promise<Firestore | null> {
 async function processLayer(
   layer: LayerConfig,
   seenUrls: Set<string>,
-  adminDb: Firestore | null,
-  dryRun: boolean
+  adminDb: Firestore | null
 ): Promise<CrawlSummary> {
   console.log(`\n📡 Зареждане на слой ${layer.id} – ${layer.name}`);
   const features = await fetchLayerFeatures(layer);
@@ -386,7 +380,7 @@ async function processLayer(
   const result: CrawlSummary = { saved: 0, skipped: 0, emptyLayers: 0 };
 
   for (const feature of features) {
-    await handleFeature(feature, layer, seenUrls, adminDb, result, dryRun);
+    await handleFeature(feature, layer, seenUrls, adminDb, result);
   }
 
   return result;
@@ -397,8 +391,7 @@ async function handleFeature(
   layer: LayerConfig,
   seenUrls: Set<string>,
   adminDb: Firestore | null,
-  summary: CrawlSummary,
-  dryRun: boolean
+  summary: CrawlSummary
 ): Promise<void> {
   const document = buildSourceDocument(feature, layer);
   if (!document) {
@@ -409,11 +402,6 @@ async function handleFeature(
     return;
   }
   seenUrls.add(document.url);
-
-  if (dryRun) {
-    console.log(`📝 [dry-run] ${document.title}`);
-    return;
-  }
 
   if (!adminDb) {
     throw new Error("Firestore is not initialized");
@@ -433,23 +421,14 @@ function logSummary(summary: CrawlSummary): void {
   console.log("\n" + "=".repeat(60));
   console.log("📊 Резюме на обработката");
   console.log(`✅ Нови записи: ${summary.saved}`);
-  if (!isDryRun) {
-    console.log(`⏭️  Пропуснати (вече съществуват): ${summary.skipped}`);
-  }
   console.log(`ℹ️ Празни слоеве: ${summary.emptyLayers}`);
   console.log("=".repeat(60));
-
-  if (isDryRun) {
-    console.log(
-      "💡 Dry-run режимът не записва в Firestore. Стартирайте без --dry-run за реално записване."
-    );
-  }
 }
 
 // Run only when executed directly
 if (require.main === module) {
   // eslint-disable-next-line unicorn/prefer-top-level-await
-  crawl(false).catch((error) => {
+  crawl().catch((error) => {
     console.error("❌ Софийска вода crawler се провали:", error);
     process.exit(1);
   });
