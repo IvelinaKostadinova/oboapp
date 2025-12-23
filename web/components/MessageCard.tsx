@@ -1,0 +1,130 @@
+"use client";
+
+import { useState } from "react";
+import { Message } from "@/lib/types";
+import sources from "@/lib/sources.json";
+
+interface MessageCardProps {
+  readonly message: Message;
+  readonly onClick: (message: Message) => void;
+}
+
+export function MessageCardSkeleton() {
+  return (
+    <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+      <div className="space-y-4 animate-pulse">
+        {/* Source logo skeleton */}
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 bg-gray-200 rounded"></div>
+          <div className="flex-1">
+            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+          </div>
+        </div>
+
+        {/* Text snippet skeleton */}
+        <div className="space-y-2">
+          <div className="h-3 bg-gray-200 rounded"></div>
+          <div className="h-3 bg-gray-200 rounded"></div>
+          <div className="h-3 bg-gray-200 rounded w-5/6"></div>
+        </div>
+
+        {/* Timestamp skeleton */}
+        <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+      </div>
+    </div>
+  );
+}
+
+export default function MessageCard({ message, onClick }: MessageCardProps) {
+  const [logoError, setLogoError] = useState(false);
+
+  // Find source info
+  const sourceInfo = sources.find((s) => s.id === message.source);
+  const logoPath = message.source ? `/sources/${message.source}.png` : null;
+
+  // Create text snippet (120-150 characters)
+  const createSnippet = (text: string): string => {
+    const maxLength = 150;
+    if (text.length <= maxLength) return text;
+
+    // Try to cut at a word boundary near 150 chars
+    const truncated = text.substring(0, maxLength);
+    const lastSpace = truncated.lastIndexOf(" ");
+
+    if (lastSpace > 120) {
+      return truncated.substring(0, lastSpace) + "...";
+    }
+
+    return truncated + "...";
+  };
+
+  // Format date in Bulgarian
+  const formatDate = (dateStr: Date | string | undefined): string => {
+    if (!dateStr) return "";
+
+    const date = typeof dateStr === "string" ? new Date(dateStr) : dateStr;
+    if (Number.isNaN(date.getTime())) return "";
+
+    const day = date.getDate().toString().padStart(2, "0");
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    const year = date.getFullYear();
+    const hours = date.getHours().toString().padStart(2, "0");
+    const minutes = date.getMinutes().toString().padStart(2, "0");
+
+    return `${day}.${month}.${year} ${hours}:${minutes}`;
+  };
+
+  const snippet = createSnippet(message.text);
+  const formattedDate = formatDate(message.finalizedAt);
+
+  return (
+    <button
+      type="button"
+      className="bg-white rounded-lg shadow-md p-6 border border-gray-200 hover:shadow-lg transition-shadow cursor-pointer w-full text-left"
+      onClick={() => onClick(message)}
+    >
+      <div className="space-y-4">
+        {/* Source */}
+        <div className="flex items-center space-x-3">
+          {logoPath && !logoError ? (
+            <img
+              src={logoPath}
+              alt={sourceInfo?.name || message.source}
+              className="w-10 h-10 object-contain flex-shrink-0"
+              onError={() => setLogoError(true)}
+            />
+          ) : (
+            <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center flex-shrink-0">
+              <svg
+                className="w-6 h-6 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
+              </svg>
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-semibold text-gray-900 truncate">
+              {sourceInfo?.name || message.source || "Неизвестен източник"}
+            </h3>
+          </div>
+        </div>
+
+        {/* Text snippet */}
+        <p className="text-sm text-gray-700 line-clamp-3">{snippet}</p>
+
+        {/* Timestamp */}
+        {formattedDate && (
+          <p className="text-xs text-gray-500">{formattedDate}</p>
+        )}
+      </div>
+    </button>
+  );
+}

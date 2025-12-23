@@ -8,6 +8,7 @@ import NotificationPrompt from "@/components/NotificationPrompt";
 import LoginPrompt from "@/components/LoginPrompt";
 import AddInterestButton from "@/components/AddInterestButton";
 import AddInterestsPrompt from "@/components/AddInterestsPrompt";
+import MessagesGrid from "@/components/MessagesGrid";
 import { Message, Interest } from "@/lib/types";
 import { useInterests } from "@/lib/hooks/useInterests";
 import { useNotificationPrompt } from "@/lib/hooks/useNotificationPrompt";
@@ -17,7 +18,6 @@ export default function HomeContent() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [mapHeight, setMapHeight] = useState<number>(600);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [centerMapFn, setCenterMapFn] = useState<
     | ((
@@ -67,23 +67,6 @@ export default function HomeContent() {
         });
     }
   }, [user, interests.length, checkAndPromptForNotifications]);
-
-  // Calculate map height based on viewport
-  useEffect(() => {
-    const updateHeight = () => {
-      if (containerRef.current) {
-        const height = containerRef.current.clientHeight;
-        setMapHeight(height);
-      }
-    };
-
-    updateHeight();
-    globalThis.addEventListener("resize", updateHeight);
-
-    return () => {
-      globalThis.removeEventListener("resize", updateHeight);
-    };
-  }, []);
 
   const fetchMessages = useCallback(async () => {
     try {
@@ -292,7 +275,7 @@ export default function HomeContent() {
   }, []);
 
   return (
-    <div className="flex-1 flex flex-col" ref={containerRef}>
+    <div className="flex-1 flex flex-col overflow-y-auto" ref={containerRef}>
       {/* Error message if any */}
       {error && (
         <div className="bg-white border-b shadow-sm z-10">
@@ -304,8 +287,11 @@ export default function HomeContent() {
         </div>
       )}
 
-      {/* Map - Takes all available space */}
-      <div className="flex-1 relative" style={{ minHeight: `${mapHeight}px` }}>
+      {/* Map - Takes viewport height to allow scrolling */}
+      <div
+        className="relative"
+        style={{ height: "calc(100vh - 120px)", minHeight: "500px" }}
+      >
         {isLoading ? (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
             <p className="text-gray-600">Зареждане на картата...</p>
@@ -343,6 +329,16 @@ export default function HomeContent() {
           </>
         )}
       </div>
+
+      {/* Messages Grid - Below the map */}
+      <MessagesGrid
+        messages={messages}
+        isLoading={isLoading}
+        onMessageClick={(message) => {
+          setSelectedMessage(message);
+          router.push(`/?messageId=${message.id}`, { scroll: false });
+        }}
+      />
 
       {/* Message Detail View */}
       <MessageDetailView
