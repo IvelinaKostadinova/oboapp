@@ -6,7 +6,7 @@ export default function Footer() {
   return (
     <footer className="bg-[#f8f9fa] border-t border-gray-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Contact Section */}
           <div>
             <h3 className="font-bold text-lg mb-4 text-gray-900">
@@ -55,8 +55,22 @@ export default function Footer() {
                   rayon-oborishte.bg
                 </a>
               </div>
+            </div>
+          </div>
+
+          {/* About Section */}
+          <div>
+            <h3 className="font-bold text-lg mb-4 text-gray-900">За проекта</h3>
+            <div className="space-y-2 text-sm">
               <div>
-                <p className="font-semibold text-gray-900">Източници</p>
+                <a
+                  href="/kak-se-rodi"
+                  className="text-[#5DADE2] hover:underline"
+                >
+                  Как се роди?
+                </a>
+              </div>
+              <div>
                 <a href="/sources" className="text-[#5DADE2] hover:underline">
                   Източници на данни
                 </a>
