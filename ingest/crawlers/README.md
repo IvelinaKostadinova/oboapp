@@ -5,6 +5,7 @@ Automated data collectors that fetch public notifications and disruptions from e
 ## Available Crawlers
 
 - **rayon-oborishte-bg** - Scrapes repair/disruption notices from Rayon Oborishte's website
+- **sofia-bg** - Scrapes municipal repair announcements and traffic changes from Sofia.bg
 - **sofiyska-voda** - Fetches water supply disruptions from Sofiyska Voda's ArcGIS API
 - **toplo-bg** - Fetches heating infrastructure incidents from Toplo.bg with pre-geocoded polygons
 
