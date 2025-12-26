@@ -12,7 +12,7 @@ describe("geocoding-utils", () => {
       expect(SOFIA_BOUNDS).toEqual({
         south: 42.605,
         west: 23.188,
-        north: 42.788,
+        north: 42.83,
         east: 23.528,
       });
     });
@@ -22,7 +22,7 @@ describe("geocoding-utils", () => {
     });
 
     it("should format SOFIA_BBOX correctly", () => {
-      expect(SOFIA_BBOX).toBe("42.605,23.188,42.788,23.528");
+      expect(SOFIA_BBOX).toBe("42.605,23.188,42.83,23.528");
     });
 
     it("should have Sofia center within Sofia bounds", () => {
