@@ -205,6 +205,12 @@ async function matchMessagesWithInterests(
         continue;
       }
 
+      // Only match if the message was created after the interest was created
+      // Both message.createdAt and interest.createdAt are ISO strings
+      if (message.createdAt < interest.createdAt) {
+        continue;
+      }
+
       const { matches: isMatch, distance } = matchMessageToInterest(
         message,
         interest
