@@ -1,0 +1,36 @@
+"use client";
+
+import Link from "next/link";
+
+interface NotificationHistorySectionProps {
+  readonly count: number;
+}
+
+export default function NotificationHistorySection({
+  count,
+}: NotificationHistorySectionProps) {
+  if (count === 0) {
+    return null;
+  }
+
+  return (
+    <section className="bg-white rounded-lg shadow mb-6 p-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-1">
+            История на известията
+          </h2>
+          <p className="text-gray-600">
+            Получили сте общо {count} {count === 1 ? "известие" : "известия"}
+          </p>
+        </div>
+        <Link
+          href="/notifications"
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          Вижте история
+        </Link>
+      </div>
+    </section>
+  );
+}

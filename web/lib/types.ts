@@ -110,6 +110,51 @@ export interface NotificationSubscription {
   };
 }
 
+// Device Notification (tracking individual device send)
+export interface DeviceNotification {
+  subscriptionId: string; // Reference to notificationSubscription doc
+  deviceInfo?: {
+    userAgent?: string;
+  };
+  sentAt: Date | string;
+  success: boolean;
+  error?: string; // Error message if failed
+}
+
+// Message Snapshot (denormalized message data)
+export interface MessageSnapshot {
+  text: string;
+  source?: string;
+  sourceUrl?: string;
+  createdAt: string;
+}
+
+// Notification Match (message matched to user's interest)
+export interface NotificationMatch {
+  id?: string;
+  userId: string;
+  messageId: string;
+  interestId: string;
+  matchedAt: Date | string;
+  notified: boolean; // Whether notification was sent
+  notifiedAt?: Date | string;
+  notificationError?: string; // Error if notification failed
+  distance?: number; // Distance in meters from interest center to closest point
+  deviceNotifications?: DeviceNotification[]; // Array of device-specific sends
+  messageSnapshot?: MessageSnapshot; // Denormalized message data
+}
+
+// Notification History Item (for API response)
+export interface NotificationHistoryItem {
+  id: string;
+  messageId: string;
+  messageSnapshot: MessageSnapshot;
+  notifiedAt: string;
+  distance?: number;
+  interestId: string;
+  successfulDevicesCount: number;
+}
+
 // Source Configuration
 export interface SourceConfig {
   id: string;

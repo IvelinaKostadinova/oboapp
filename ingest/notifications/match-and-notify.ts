@@ -10,6 +10,7 @@ import {
   Interest,
   NotificationMatch,
   NotificationSubscription,
+  DeviceNotification,
 } from "@/lib/types";
 
 // Load environment variables
@@ -479,26 +480,76 @@ async function sendNotifications(
       continue;
     }
 
-    // Send to the first active subscription (one notification per user per message)
-    const subscription = subscriptions[0];
-    const result = await sendPushNotification(
-      messaging,
-      subscription,
-      message,
-      match
-    );
+    // Send to ALL user devices and track each send
+    const deviceNotifications: DeviceNotification[] = [];
+    let deviceSuccessCount = 0;
 
-    if (result.success) {
+    for (const subscription of subscriptions) {
+      const result = await sendPushNotification(
+        messaging,
+        subscription,
+        message,
+        match
+      );
+
+      const deviceNotification: DeviceNotification = {
+        subscriptionId: subscription.id || "",
+        deviceInfo: subscription.deviceInfo,
+        sentAt: new Date().toISOString(),
+        success: result.success,
+      };
+
+      // Only include error field if there was an error (avoid undefined)
+      if (result.error) {
+        deviceNotification.error = result.error;
+      }
+
+      deviceNotifications.push(deviceNotification);
+
+      if (result.success) {
+        deviceSuccessCount++;
+      }
+    }
+
+    if (deviceSuccessCount > 0) {
       successCount++;
       console.log(
         `   ✅ Sent to user ${match.userId.substring(
           0,
           8
-        )} for message ${match.messageId.substring(0, 8)}`
+        )} on ${deviceSuccessCount}/${
+          subscriptions.length
+        } devices for message ${match.messageId.substring(0, 8)}`
       );
     } else {
       errorCount++;
+      console.log(
+        `   ❌ Failed to send to any device for user ${match.userId.substring(
+          0,
+          8
+        )}`
+      );
     }
+
+    // Store deviceNotifications and messageSnapshot in the match document
+    const messageSnapshot: any = {
+      text: messageData?.text || "",
+      createdAt: convertTimestamp(messageData?.createdAt),
+    };
+
+    // Only add optional fields if they exist (avoid undefined in Firestore)
+    if (messageData?.source) {
+      messageSnapshot.source = messageData.source;
+    }
+    if (messageData?.sourceUrl) {
+      messageSnapshot.sourceUrl = messageData.sourceUrl;
+    }
+
+    // Update the match document with device notifications and message snapshot
+    await matchesRef.doc(match.id).update({
+      deviceNotifications,
+      messageSnapshot,
+    });
   }
 
   // Mark all related matches as notified

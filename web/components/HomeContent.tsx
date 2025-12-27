@@ -103,7 +103,12 @@ export default function HomeContent() {
 
   // Check if user has zones but no subscriptions
   useEffect(() => {
-    if (!user || interests.length === 0 || hasCheckedSubscriptions || showPrompt) {
+    if (
+      !user ||
+      interests.length === 0 ||
+      hasCheckedSubscriptions ||
+      showPrompt
+    ) {
       return;
     }
 
