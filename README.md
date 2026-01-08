@@ -30,3 +30,9 @@ See [web/](web) for details.
 - **AI**: Google Gemini for address extraction
 - **Infrastructure**: Google Cloud Run, Terraform, Docker, Vercel
 - **Automation**: Playwright for web scraping
+
+## Documentation
+
+- [Message Filtering](docs/features/message-filtering.md) - AI-powered content filtering, address extraction, geocoding, and time-based relevance for infrastructure disruption messages
+
+Documentation is written for technical stakeholders, system administrators, and QA personnel who need to understand system behavior and configuration. Focus is on facts and behavior rather than implementation details, with diagrams for complex flows and practical configuration guidance.
