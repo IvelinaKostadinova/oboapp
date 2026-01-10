@@ -46,10 +46,16 @@ export interface StreetSection {
   timespans: Timespan[];
 }
 
+export interface CadastralProperty {
+  identifier: string;
+  timespans: Timespan[];
+}
+
 export interface ExtractedData {
   responsible_entity: string;
   pins: Pin[];
   streets: StreetSection[];
+  cadastralProperties?: CadastralProperty[];
   markdown_text?: string;
 }
 

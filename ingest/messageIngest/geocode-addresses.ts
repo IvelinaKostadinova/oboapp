@@ -1,13 +1,16 @@
 import {
   geocodeAddresses,
   geocodeIntersectionsForStreets,
+  geocodeCadastralPropertiesFromIdentifiers,
 } from "@/lib/geocoding-router";
 import { Address, ExtractedData, StreetSection } from "@/lib/types";
+import type { CadastralGeometry } from "@/lib/cadastre-geocoding-service";
 
 // Internal types for the geocoding pipeline
 export interface GeocodingResult {
   preGeocodedMap: Map<string, { lat: number; lng: number }>;
   addresses: Address[];
+  cadastralGeometries?: Map<string, CadastralGeometry>;
 }
 
 /**
@@ -34,13 +37,14 @@ export function findMissingStreetEndpoints(
 
 /**
  * Step 4: Geocode addresses from extracted data using hybrid approach
- * Google for pins, Overpass for street intersections
+ * Google for pins, Overpass for street intersections, Cadastre for УПИ
  */
 export async function geocodeAddressesFromExtractedData(
   extractedData: ExtractedData | null
 ): Promise<GeocodingResult> {
   const preGeocodedMap = new Map<string, { lat: number; lng: number }>();
   let addresses: Address[] = [];
+  let cadastralGeometries: Map<string, CadastralGeometry> | undefined;
 
   if (!extractedData) {
     return { preGeocodedMap, addresses };
@@ -95,5 +99,22 @@ export async function geocodeAddressesFromExtractedData(
     }
   }
 
-  return { preGeocodedMap, addresses };
+  // Geocode cadastral properties using Bulgarian Cadastre API
+  if (
+    extractedData.cadastralProperties &&
+    extractedData.cadastralProperties.length > 0
+  ) {
+    const identifiers = extractedData.cadastralProperties.map(
+      (prop) => prop.identifier
+    );
+    cadastralGeometries = await geocodeCadastralPropertiesFromIdentifiers(
+      identifiers
+    );
+
+    console.log(
+      `[Geocoding] Geocoded ${cadastralGeometries.size}/${identifiers.length} cadastral properties`
+    );
+  }
+
+  return { preGeocodedMap, addresses, cadastralGeometries };
 }

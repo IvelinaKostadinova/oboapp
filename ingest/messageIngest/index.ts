@@ -130,8 +130,11 @@ export async function messageIngest(
     const { geocodeAddressesFromExtractedData } = await import(
       "./geocode-addresses"
     );
-    const { preGeocodedMap, addresses: geocodedAddresses } =
-      await geocodeAddressesFromExtractedData(extractedData);
+    const {
+      preGeocodedMap,
+      addresses: geocodedAddresses,
+      cadastralGeometries,
+    } = await geocodeAddressesFromExtractedData(extractedData);
 
     // Filter outlier coordinates
     const { filterOutlierCoordinates } = await import("./filter-outliers");
@@ -156,7 +159,8 @@ export async function messageIngest(
     );
     geoJson = await convertMessageGeocodingToGeoJson(
       extractedData,
-      preGeocodedMap
+      preGeocodedMap,
+      cadastralGeometries
     );
   } else if (options.markdownText) {
     // When using precomputed GeoJSON, store markdown_text if provided

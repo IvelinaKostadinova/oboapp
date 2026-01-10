@@ -199,11 +199,37 @@ export async function extractStructuredData(
               }))
           : [];
 
+        // Validate and filter cadastralProperties array
+        const validCadastralProperties = Array.isArray(
+          parsedResponse.cadastralProperties
+        )
+          ? parsedResponse.cadastralProperties
+              .filter(
+                (prop: any) =>
+                  prop &&
+                  typeof prop === "object" &&
+                  typeof prop.identifier === "string" &&
+                  prop.identifier.trim().length > 0 &&
+                  Array.isArray(prop.timespans)
+              )
+              .map((prop: any) => ({
+                identifier: prop.identifier,
+                timespans: prop.timespans.filter(
+                  (time: any) =>
+                    time &&
+                    typeof time === "object" &&
+                    typeof time.start === "string" &&
+                    typeof time.end === "string"
+                ),
+              }))
+          : [];
+
         // Return the full structured data
         const extractedData: ExtractedData = {
           responsible_entity: parsedResponse.responsible_entity || "",
           pins: validPins,
           streets: validStreets,
+          cadastralProperties: validCadastralProperties,
           markdown_text: parsedResponse.markdown_text || "",
         };
 

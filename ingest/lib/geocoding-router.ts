@@ -3,6 +3,7 @@
  *
  * Google Geocoding API for pins (specific addresses)
  * OpenStreetMap Overpass API for streets (intersections and geometries)
+ * Bulgarian Cadastre API for cadastral properties (УПИ)
  */
 
 import { Address, StreetSection } from "./types";
@@ -11,6 +12,10 @@ import {
   overpassGeocodeAddresses,
   overpassGeocodeIntersections,
 } from "./overpass-geocoding-service";
+import {
+  geocodeCadastralProperties,
+  type CadastralGeometry,
+} from "./cadastre-geocoding-service";
 
 /**
  * Geocode a list of addresses (pins) using Google Geocoding API
@@ -92,4 +97,17 @@ export async function geocodeIntersectionsForStreets(
   });
 
   return geocodedMap;
+}
+
+/**
+ * Geocode cadastral properties using Bulgarian Cadastre API
+ */
+export async function geocodeCadastralPropertiesFromIdentifiers(
+  identifiers: string[]
+): Promise<Map<string, CadastralGeometry>> {
+  if (identifiers.length === 0) {
+    return new Map();
+  }
+
+  return geocodeCadastralProperties(identifiers);
 }

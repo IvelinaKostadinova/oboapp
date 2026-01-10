@@ -1,6 +1,11 @@
 import { convertToGeoJSON } from "@/lib/geojson-service";
-import { ExtractedData, GeoJSONFeatureCollection } from "@/lib/types";
+import {
+  ExtractedData,
+  GeoJSONFeatureCollection,
+  GeoJSONFeature,
+} from "@/lib/types";
 import { validateAndFixGeoJSON } from "../crawlers/shared/geojson-validation";
+import type { CadastralGeometry } from "@/lib/cadastre-geocoding-service";
 
 /**
  * Helper: Validate that all addresses have been geocoded
@@ -36,7 +41,8 @@ export function validateAllAddressesGeocoded(
  */
 export async function convertMessageGeocodingToGeoJson(
   extractedData: ExtractedData | null,
-  preGeocodedMap: Map<string, { lat: number; lng: number }>
+  preGeocodedMap: Map<string, { lat: number; lng: number }>,
+  cadastralGeometries?: Map<string, CadastralGeometry>
 ): Promise<GeoJSONFeatureCollection | null> {
   if (!extractedData) {
     return null;
@@ -60,7 +66,9 @@ export async function convertMessageGeocodingToGeoJson(
 
   // Check if we have ANY features to display
   const hasFeatures =
-    filteredData.pins.length > 0 || filteredData.streets.length > 0;
+    filteredData.pins.length > 0 ||
+    filteredData.streets.length > 0 ||
+    (cadastralGeometries && cadastralGeometries.size > 0);
 
   if (!hasFeatures) {
     console.error(
@@ -80,6 +88,53 @@ export async function convertMessageGeocodingToGeoJson(
   }
 
   const geoJson = await convertToGeoJSON(filteredData, preGeocodedMap);
+
+  // Add cadastral property features
+  if (
+    cadastralGeometries &&
+    cadastralGeometries.size > 0 &&
+    extractedData.cadastralProperties
+  ) {
+    const cadastralFeatures: GeoJSONFeature[] = [];
+
+    for (const cadastralProp of extractedData.cadastralProperties) {
+      const geometry = cadastralGeometries.get(cadastralProp.identifier);
+
+      if (geometry) {
+        cadastralFeatures.push({
+          type: "Feature",
+          geometry: {
+            type: "Polygon",
+            coordinates: geometry.polygon,
+          },
+          properties: {
+            feature_type: "cadastral_property",
+            locationType: "cadastral_property",
+            identifier: cadastralProp.identifier,
+            start_time: cadastralProp.timespans[0]?.start || "",
+            end_time: cadastralProp.timespans[0]?.end || "",
+            timespans: JSON.stringify(cadastralProp.timespans),
+          },
+        });
+      } else {
+        console.warn(
+          `⚠️  Cadastral property ${cadastralProp.identifier} failed to geocode`
+        );
+      }
+    }
+
+    if (cadastralFeatures.length > 0) {
+      if (geoJson) {
+        geoJson.features.push(...cadastralFeatures);
+      } else {
+        // Only cadastral features
+        return {
+          type: "FeatureCollection",
+          features: cadastralFeatures,
+        };
+      }
+    }
+  }
 
   // Validate the generated geoJson
   if (geoJson) {
