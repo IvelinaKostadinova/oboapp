@@ -12,3 +12,14 @@ export interface SourceDocumentWithGeoJson extends BaseSourceDocument {
   geoJson: import("../../lib/types").GeoJSONFeatureCollection;
   markdownText: string; // Required for crawlers with precomputed GeoJSON
 }
+
+/**
+ * Post link extracted from index/listing pages
+ * Used by long-flow webpage crawlers (sofia-bg, rayon-oborishte-bg, mladost-bg, studentski-bg)
+ */
+export interface PostLink {
+  url: string;
+  title: string;
+  date: string;
+  time?: string; // Optional for crawlers that extract time separately (e.g., mladost-bg)
+}
