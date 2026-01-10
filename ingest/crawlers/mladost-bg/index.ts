@@ -11,7 +11,6 @@ import {
   crawlWordpressPage,
   processWordpressPost,
 } from "../shared/webpage-crawlers";
-import { parseShortBulgarianDateTime } from "../shared/date-utils";
 
 // Load environment variables from .env.local
 dotenv.config({ path: resolve(process.cwd(), ".env.local") });
@@ -36,21 +35,14 @@ const processPost = (
     SOURCE_TYPE,
     DELAY_BETWEEN_REQUESTS,
     extractPostDetails,
-    (url, postLink, details) => {
-      const { date, time, title } = postLink;
-      const dateText = time ? `${date} ${time}` : date;
-      return buildWebPageSourceDocument(
+    (url, _postLink, details) =>
+      buildWebPageSourceDocument(
         url,
-        details.title || title,
-        dateText,
+        details.title,
+        details.dateText,
         details.contentHtml,
-        SOURCE_TYPE,
-        (dateStr) => {
-          const [datePart, timePart] = dateStr.split(" ");
-          return parseShortBulgarianDateTime(datePart, timePart);
-        }
-      );
-    }
+        SOURCE_TYPE
+      )
   );
 
 /**

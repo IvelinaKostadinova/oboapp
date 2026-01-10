@@ -4,9 +4,6 @@ import { SELECTORS } from "./selectors";
 
 /**
  * Extract post links from the index page
- *
- * Note: mladost.bg includes time information separately from the date,
- * so we need a custom implementation that extends the base extractor pattern.
  */
 export async function extractPostLinks(page: Page): Promise<PostLink[]> {
   console.log("📋 Extracting post links from index page...");
@@ -16,7 +13,6 @@ export async function extractPostLinks(page: Page): Promise<PostLink[]> {
       url: string;
       title: string;
       date: string;
-      time?: string;
     }> = [];
 
     const containers = document.querySelectorAll(".news");
@@ -35,16 +31,12 @@ export async function extractPostLinks(page: Page): Promise<PostLink[]> {
       );
       const title = titleEl?.textContent?.trim() || "";
 
-      // Extract date
+      // Extract date (DD.MM.YY format)
       const dateEl = container.querySelector("span.date, .date");
       const date = dateEl?.textContent?.trim() || "";
 
-      // Extract time (specific to mladost.bg)
-      const timeEl = container.querySelector("span.time, .time");
-      const time = timeEl?.textContent?.trim() || undefined;
-
       if (url && title) {
-        postLinks.push({ url, title, date, time });
+        postLinks.push({ url, title, date });
       }
     });
 

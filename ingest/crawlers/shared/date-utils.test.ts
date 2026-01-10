@@ -78,6 +78,42 @@ describe("parseBulgarianDate", () => {
     // ISO string should match YYYY-MM-DDTHH:mm:ss.sssZ format
     expect(isoDate).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
   });
+
+  it("should parse date with 2-digit year (DD.MM.YY)", () => {
+    const isoDate = parseBulgarianDate("17.07.25");
+
+    const date = new Date(isoDate);
+    expect(date.getDate()).toBe(17);
+    expect(date.getMonth()).toBe(6); // July (0-indexed)
+    expect(date.getFullYear()).toBe(2025);
+  });
+
+  it("should parse date with 2-digit year and slash separator (DD/MM/YY)", () => {
+    const isoDate = parseBulgarianDate("15/03/24");
+
+    const date = new Date(isoDate);
+    expect(date.getDate()).toBe(15);
+    expect(date.getMonth()).toBe(2); // March
+    expect(date.getFullYear()).toBe(2024);
+  });
+
+  it("should parse date with 2-digit year and leading zeros (DD.MM.YY)", () => {
+    const isoDate = parseBulgarianDate("01.01.26");
+
+    const date = new Date(isoDate);
+    expect(date.getDate()).toBe(1);
+    expect(date.getMonth()).toBe(0); // January
+    expect(date.getFullYear()).toBe(2026);
+  });
+
+  it("should handle 2-digit year assuming 20XX century", () => {
+    const isoDate = parseBulgarianDate("31.12.99");
+
+    const date = new Date(isoDate);
+    expect(date.getDate()).toBe(31);
+    expect(date.getMonth()).toBe(11); // December
+    expect(date.getFullYear()).toBe(2099);
+  });
 });
 
 describe("parseBulgarianDateTime", () => {

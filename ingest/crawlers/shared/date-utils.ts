@@ -1,14 +1,21 @@
 /**
- * Parse Bulgarian date format (DD.MM.YYYY or DD/MM/YYYY) to ISO string
+ * Parse Bulgarian date format (DD.MM.YYYY, DD.MM.YY, or DD/MM/YYYY) to ISO string
+ * Supports both 2-digit (YY) and 4-digit (YYYY) years
  */
 export function parseBulgarianDate(dateStr: string): string {
   try {
-    // Format: "19.12.2025" or "19/12/2025"
+    // Format: "19.12.2025" or "19/12/2025" or "17.07.25"
     // Handle both dot and slash separators
     const normalized = dateStr.trim().replace(/\//g, ".");
     const parts = normalized.split(".");
     if (parts.length === 3) {
-      const [day, month, year] = parts;
+      let [day, month, year] = parts;
+
+      // Convert 2-digit year to 4-digit year (assume 20XX)
+      if (year.length === 2) {
+        year = `20${year}`;
+      }
+
       const date = new Date(`${year}-${month}-${day}`);
       if (!Number.isNaN(date.getTime())) {
         return date.toISOString();
