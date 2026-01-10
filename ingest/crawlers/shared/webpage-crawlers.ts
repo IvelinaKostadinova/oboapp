@@ -4,7 +4,8 @@ import { Browser, Page } from "playwright";
 import type { Firestore } from "firebase-admin/firestore";
 import { PostLink } from "./types";
 import { launchBrowser } from "./browser";
-import { isUrlProcessed } from "./firestore";
+import { isUrlProcessed, saveSourceDocument } from "./firestore";
+import { delay } from "@/lib/delay";
 
 const turndownService = createTurndownService();
 
@@ -49,6 +50,64 @@ export function buildWebPageSourceDocument(
     message,
     sourceType,
   };
+}
+
+/**
+ * Process a single WordPress post
+ * Generic implementation that accepts a custom document builder
+ */
+export async function processWordpressPost<
+  TPostLink extends PostLink,
+  TDetails extends { title: string; dateText: string; contentHtml: string }
+>(
+  browser: Browser,
+  postLink: TPostLink,
+  adminDb: Firestore,
+  sourceType: string,
+  delayMs: number,
+  extractPostDetails: (page: Page) => Promise<TDetails>,
+  buildDocument: (
+    url: string,
+    postLink: TPostLink,
+    details: TDetails
+  ) => {
+    url: string;
+    title: string;
+    datePublished: string;
+    message: string;
+    sourceType: string;
+  }
+): Promise<void> {
+  const { url, title } = postLink;
+
+  console.log(`\n🔍 Processing: ${title.substring(0, 60)}...`);
+
+  const page = await browser.newPage();
+
+  try {
+    console.log(`📥 Fetching: ${url}`);
+    await page.goto(url, { waitUntil: "networkidle" });
+
+    const details = await extractPostDetails(page);
+
+    const postDetails = buildDocument(url, postLink, details);
+
+    const sourceDoc = {
+      ...postDetails,
+      crawledAt: new Date(),
+    };
+
+    await saveSourceDocument(sourceDoc, adminDb);
+
+    console.log(`✅ Successfully processed: ${title.substring(0, 60)}...`);
+  } catch (error) {
+    console.error(`❌ Error processing post: ${url}`, error);
+    throw error;
+  } finally {
+    await page.close();
+  }
+
+  await delay(delayMs);
 }
 
 /**

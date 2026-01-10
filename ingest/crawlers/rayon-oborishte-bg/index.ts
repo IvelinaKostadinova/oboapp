@@ -4,13 +4,12 @@ import dotenv from "dotenv";
 import { resolve } from "node:path";
 import { Browser } from "playwright";
 import type { Firestore } from "firebase-admin/firestore";
-import { SourceDocument, PostLink } from "./types";
-import { saveSourceDocument } from "../shared/firestore";
-import { delay } from "@/lib/delay";
+import { PostLink } from "./types";
 import { extractPostLinks, extractPostDetails } from "./extractors";
 import {
   buildWebPageSourceDocument,
   crawlWordpressPage,
+  processWordpressPost,
 } from "../shared/webpage-crawlers";
 
 // Load environment variables from .env.local
@@ -24,50 +23,27 @@ const DELAY_BETWEEN_REQUESTS = 2000; // 2 seconds
 /**
  * Process a single post
  */
-async function processPost(
+const processPost = (
   browser: Browser,
   postLink: PostLink,
   adminDb: Firestore
-): Promise<void> {
-  const { url, title } = postLink;
-
-  console.log(`\n🔍 Processing: ${title.substring(0, 60)}...`);
-
-  const page = await browser.newPage();
-
-  try {
-    console.log(`📥 Fetching: ${url}`);
-    await page.goto(url, { waitUntil: "networkidle" });
-
-    // Extract post details
-    const details = await extractPostDetails(page);
-    const postDetails = buildWebPageSourceDocument(
-      url,
-      details.title,
-      details.dateText,
-      details.contentHtml,
-      SOURCE_TYPE
-    ) as Omit<SourceDocument, "crawledAt">;
-
-    // Save to Firestore
-    const sourceDoc: SourceDocument = {
-      ...postDetails,
-      crawledAt: new Date(),
-    };
-
-    await saveSourceDocument(sourceDoc, adminDb);
-
-    console.log(`✅ Successfully processed: ${title.substring(0, 60)}...`);
-  } catch (error) {
-    console.error(`❌ Error processing post: ${url}`, error);
-    throw error; // Re-throw to fail the entire process
-  } finally {
-    await page.close();
-  }
-
-  // Wait before next request
-  await delay(DELAY_BETWEEN_REQUESTS);
-}
+) =>
+  processWordpressPost(
+    browser,
+    postLink,
+    adminDb,
+    SOURCE_TYPE,
+    DELAY_BETWEEN_REQUESTS,
+    extractPostDetails,
+    (url, _postLink, details) =>
+      buildWebPageSourceDocument(
+        url,
+        details.title,
+        details.dateText,
+        details.contentHtml,
+        SOURCE_TYPE
+      )
+  );
 
 /**
  * Main crawler function

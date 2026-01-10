@@ -4,13 +4,12 @@ import dotenv from "dotenv";
 import { resolve } from "node:path";
 import { Browser } from "playwright";
 import type { Firestore } from "firebase-admin/firestore";
-import { SourceDocument, PostLink } from "./types";
-import { saveSourceDocument } from "../shared/firestore";
-import { delay } from "@/lib/delay";
+import { PostLink } from "./types";
 import { extractPostLinks, extractPostDetails } from "./extractors";
 import {
   buildWebPageSourceDocument,
   crawlWordpressPage,
+  processWordpressPost,
 } from "../shared/webpage-crawlers";
 import { parseShortBulgarianDateTime } from "../shared/date-utils";
 
@@ -25,59 +24,34 @@ const DELAY_BETWEEN_REQUESTS = 2000; // 2 seconds
 /**
  * Process a single post
  */
-async function processPost(
+const processPost = (
   browser: Browser,
   postLink: PostLink,
   adminDb: Firestore
-): Promise<void> {
-  const { url, title, date, time } = postLink;
-
-  console.log(`\n🔍 Processing: ${title.substring(0, 60)}...`);
-
-  const page = await browser.newPage();
-
-  try {
-    console.log(`📥 Fetching: ${url}`);
-    await page.goto(url, { waitUntil: "networkidle" });
-
-    // Extract post details
-    const details = await extractPostDetails(page);
-
-    // Combine date and time from index page for custom parser
-    const dateText = time ? `${date} ${time}` : date;
-
-    // Use buildWebPageSourceDocument with custom date parser for DD.MM.YY format
-    const postDetails = buildWebPageSourceDocument(
-      url,
-      details.title || title, // Prefer detail page title, fallback to index
-      dateText,
-      details.contentHtml,
-      SOURCE_TYPE,
-      (dateStr) => {
-        const [datePart, timePart] = dateStr.split(" ");
-        return parseShortBulgarianDateTime(datePart, timePart);
-      }
-    ) as Omit<SourceDocument, "crawledAt">;
-
-    // Save to Firestore
-    const sourceDoc: SourceDocument = {
-      ...postDetails,
-      crawledAt: new Date(),
-    };
-
-    await saveSourceDocument(sourceDoc, adminDb);
-
-    console.log(`✅ Successfully processed: ${title.substring(0, 60)}...`);
-  } catch (error) {
-    console.error(`❌ Error processing post: ${url}`, error);
-    throw error; // Re-throw to fail the entire process
-  } finally {
-    await page.close();
-  }
-
-  // Wait before next request
-  await delay(DELAY_BETWEEN_REQUESTS);
-}
+) =>
+  processWordpressPost(
+    browser,
+    postLink,
+    adminDb,
+    SOURCE_TYPE,
+    DELAY_BETWEEN_REQUESTS,
+    extractPostDetails,
+    (url, postLink, details) => {
+      const { date, time, title } = postLink;
+      const dateText = time ? `${date} ${time}` : date;
+      return buildWebPageSourceDocument(
+        url,
+        details.title || title,
+        dateText,
+        details.contentHtml,
+        SOURCE_TYPE,
+        (dateStr) => {
+          const [datePart, timePart] = dateStr.split(" ");
+          return parseShortBulgarianDateTime(datePart, timePart);
+        }
+      );
+    }
+  );
 
 /**
  * Main crawler function

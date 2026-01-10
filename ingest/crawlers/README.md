@@ -21,6 +21,37 @@ Each crawler:
 3. Stores documents in Firestore with `sourceType` identifier
 4. Tracks processed URLs to avoid duplicates
 
+### Crawler Architecture
+
+WordPress-style crawlers (rayon-oborishte-bg, sofia-bg, mladost-bg, studentski-bg) use shared utilities from `shared/webpage-crawlers.ts`:
+
+- **`crawlWordpressPage`** - Manages browser, extracts post links from index page, handles deduplication, processes each post
+- **`processWordpressPost`** - Fetches post details, builds document via custom builder function, saves to Firestore
+- **`buildWebPageSourceDocument`** - Converts HTML to Markdown, parses dates (supports custom date parsers)
+
+```mermaid
+flowchart TD
+    A[crawlWordpressPage] -->|launch browser| B[Index Page]
+    B -->|extractPostLinks| C[Post URLs]
+    C -->|for each URL| D{Already<br/>processed?}
+    D -->|No| E[processWordpressPost]
+    D -->|Yes| F[Skip]
+    E -->|fetch| G[Post Page]
+    G -->|extractPostDetails| H[title, date, HTML]
+    H -->|buildDocument fn| I[buildWebPageSourceDocument]
+    I -->|HTML→MD| J[Source Document]
+    J -->|save| K[(Firestore)]
+
+    style A fill:#e1f5ff
+    style E fill:#e1f5ff
+    style I fill:#ffe1f5
+```
+
+Each crawler provides a custom `buildDocument` function:
+
+- **Standard** (sofia-bg, rayon-oborishte-bg, studentski-bg): Uses Bulgarian DD.MM.YYYY format
+- **mladost-bg**: Combines date+time from index, uses DD.MM.YY short format with custom parser
+
 ### Markdown Text Handling
 
 Crawlers handle message formatting differently based on whether they provide precomputed GeoJSON:
