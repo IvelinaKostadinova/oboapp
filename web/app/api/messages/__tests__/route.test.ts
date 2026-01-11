@@ -122,7 +122,8 @@ describe("GET /api/messages - Date Filtering", () => {
 
     await setupFirebaseMock(mockMessages);
 
-    const response = await GET();
+    const mockRequest = new Request("http://localhost/api/messages");
+    const response = await GET(mockRequest);
     const data = await response.json();
 
     expect(data.messages).toHaveLength(1);
@@ -160,7 +161,8 @@ describe("GET /api/messages - Date Filtering", () => {
 
     await setupFirebaseMock(mockMessages);
 
-    const response = await GET();
+    const mockRequest = new Request("http://localhost/api/messages");
+    const response = await GET(mockRequest);
     const data = await response.json();
 
     expect(data.messages).toHaveLength(1);
@@ -216,7 +218,8 @@ describe("GET /api/messages - Date Filtering", () => {
 
     await setupFirebaseMock(mockMessages);
 
-    const response = await GET();
+    const mockRequest = new Request("http://localhost/api/messages");
+    const response = await GET(mockRequest);
     const data = await response.json();
 
     expect(data.messages).toHaveLength(1);
@@ -240,7 +243,8 @@ describe("GET /api/messages - Date Filtering", () => {
 
     await setupFirebaseMock(mockMessages);
 
-    const response = await GET();
+    const mockRequest = new Request("http://localhost/api/messages");
+    const response = await GET(mockRequest);
     const data = await response.json();
 
     // Should be included because it's within 7 days

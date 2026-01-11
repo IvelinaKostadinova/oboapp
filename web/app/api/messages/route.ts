@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { Message, Timespan } from "@/lib/types";
 import { convertTimestamp } from "@/lib/firestore-utils";
+import {
+  clampBounds,
+  addBuffer,
+  featureIntersectsBounds,
+  type ViewportBounds,
+} from "@/lib/bounds-utils";
 
 const INGEST_SOURCE = "web-interface";
 const DEFAULT_RELEVANCE_DAYS = 7;
@@ -71,8 +77,37 @@ function isMessageRelevant(message: Message, cutoffDate: Date): boolean {
   return createdAt >= cutoffDate;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    // Parse viewport bounds from query params
+    const { searchParams } = new URL(request.url);
+    const boundsParam = {
+      north: searchParams.get("north"),
+      south: searchParams.get("south"),
+      east: searchParams.get("east"),
+      west: searchParams.get("west"),
+    };
+
+    let viewportBounds: ViewportBounds | null = null;
+    if (
+      boundsParam.north &&
+      boundsParam.south &&
+      boundsParam.east &&
+      boundsParam.west
+    ) {
+      const rawBounds: ViewportBounds = {
+        north: Number.parseFloat(boundsParam.north),
+        south: Number.parseFloat(boundsParam.south),
+        east: Number.parseFloat(boundsParam.east),
+        west: Number.parseFloat(boundsParam.west),
+      };
+
+      // Clamp to Sofia bounds
+      const clampedBounds = clampBounds(rawBounds);
+      // Add 20% buffer
+      viewportBounds = addBuffer(clampedBounds, 0.2);
+    }
+
     // Get relevance period from environment
     const relevanceDays = process.env.MESSAGE_RELEVANCE_DAYS
       ? Number.parseInt(process.env.MESSAGE_RELEVANCE_DAYS, 10)
@@ -115,9 +150,21 @@ export async function GET() {
     );
 
     // Include all messages with valid GeoJSON
-    const messages = relevantMessages.filter((message) => {
+    let messages = relevantMessages.filter((message) => {
       return message.geoJson !== null && message.geoJson !== undefined;
     });
+
+    // Filter by viewport bounds if provided
+    if (viewportBounds) {
+      messages = messages.filter((message) => {
+        if (!message.geoJson?.features) return false;
+
+        // Check if any feature intersects with viewport bounds
+        return message.geoJson.features.some((feature) =>
+          featureIntersectsBounds(feature, viewportBounds)
+        );
+      });
+    }
 
     return NextResponse.json({ messages });
   } catch (error) {

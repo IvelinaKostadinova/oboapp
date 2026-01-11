@@ -23,6 +23,12 @@ interface MapContainerProps {
     ) => void,
     mapInstance: google.maps.Map | null
   ) => void;
+  readonly onBoundsChanged: (bounds: {
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+  }) => void;
   readonly onInterestClick: (interest: Interest) => void;
   readonly onSaveInterest: (
     coordinates: { lat: number; lng: number },
@@ -40,6 +46,7 @@ export default function MapContainer({
   initialMapCenter,
   onFeatureClick,
   onMapReady,
+  onBoundsChanged,
   onInterestClick,
   onSaveInterest,
   onCancelTargetMode,
@@ -51,6 +58,7 @@ export default function MapContainer({
         messages={messages}
         onFeatureClick={onFeatureClick}
         onMapReady={onMapReady}
+        onBoundsChanged={onBoundsChanged}
         interests={interests}
         onInterestClick={onInterestClick}
         initialCenter={initialMapCenter || undefined}

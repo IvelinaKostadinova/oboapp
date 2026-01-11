@@ -14,9 +14,22 @@ import { useInterests } from "@/lib/hooks/useInterests";
 import { useNotificationPrompt } from "@/lib/hooks/useNotificationPrompt";
 import { useAuth } from "@/lib/auth-context";
 
+/**
+ * HomeContent - Main application component managing map, messages, and user interactions
+ *
+ * Loading and Initialization Flow:
+ * 1. Component mounts with isLoading=false, map renders immediately
+ * 2. Map loads and triggers onBoundsChanged when ready
+ * 3. handleBoundsChanged sets viewportBounds after 300ms debounce
+ * 4. Effect detects viewportBounds change and calls fetchMessages(viewportBounds)
+ * 5. fetchMessages sets isLoading=true, shows loading indicator
+ * 6. When fetch completes, isLoading=false, loading indicator disappears
+ *
+ * This ensures the map is visible immediately while messages load based on viewport.
+ */
 export default function HomeContent() {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [initialMapCenter, setInitialMapCenter] = useState<{
@@ -32,6 +45,15 @@ export default function HomeContent() {
       ) => void)
     | null
   >(null);
+
+  // Viewport bounds state for filtering messages
+  const [viewportBounds, setViewportBounds] = useState<{
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+  } | null>(null);
+  const boundsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Interest management state
   const [targetMode, setTargetMode] = useState<{
@@ -136,35 +158,58 @@ export default function HomeContent() {
     checkSubscriptions();
   }, [user, interests.length, hasCheckedSubscriptions, showPrompt]);
 
-  const fetchMessages = useCallback(async () => {
-    try {
-      setError(null);
-      const response = await fetch("/api/messages");
+  const fetchMessages = useCallback(
+    async (
+      bounds?: {
+        north: number;
+        south: number;
+        east: number;
+        west: number;
+      } | null
+    ) => {
+      try {
+        setIsLoading(true);
+        setError(null);
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch messages");
-      }
+        let url = "/api/messages";
+        if (bounds) {
+          const params = new URLSearchParams({
+            north: bounds.north.toString(),
+            south: bounds.south.toString(),
+            east: bounds.east.toString(),
+            west: bounds.west.toString(),
+          });
+          url += `?${params.toString()}`;
+        }
 
-      const data = await response.json();
-      setMessages(data.messages || []);
-    } catch (err) {
-      // Check if it's a network error (offline)
-      if (!navigator.onLine) {
-        setError(
-          "Няма интернет връзка. Моля, свържете се към интернет и презаредете страницата."
-        );
-      } else if (err instanceof TypeError && err.message.includes("fetch")) {
-        setError(
-          "Не успях да заредя сигналите. Проверете интернет връзката си и презаредете страницата."
-        );
-      } else {
-        setError("Не успях да заредя сигналите. Презареди страницата.");
+        const response = await fetch(url);
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch messages");
+        }
+
+        const data = await response.json();
+        setMessages(data.messages || []);
+      } catch (err) {
+        // Check if it's a network error (offline)
+        if (!navigator.onLine) {
+          setError(
+            "Няма интернет връзка. Моля, свържете се към интернет и презаредете страницата."
+          );
+        } else if (err instanceof TypeError && err.message.includes("fetch")) {
+          setError(
+            "Не успях да заредя сигналите. Проверете интернет връзката си и презаредете страницата."
+          );
+        } else {
+          setError("Не успях да заредя сигналите. Презареди страницата.");
+        }
+        console.error("Error fetching messages:", err);
+      } finally {
+        setIsLoading(false);
       }
-      console.error("Error fetching messages:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   // Handle feature click - update URL and select message
   const handleFeatureClick = useCallback(
@@ -202,6 +247,22 @@ export default function HomeContent() {
     []
   );
 
+  // Handle map bounds change - debounced at 300ms
+  const handleBoundsChanged = useCallback(
+    (bounds: { north: number; south: number; east: number; west: number }) => {
+      // Clear existing timeout
+      if (boundsTimeoutRef.current) {
+        clearTimeout(boundsTimeoutRef.current);
+      }
+
+      // Set new timeout for debounced fetch
+      boundsTimeoutRef.current = setTimeout(() => {
+        setViewportBounds(bounds);
+      }, 300);
+    },
+    []
+  );
+
   // Handle address click - center map on coordinates
   const handleAddressClick = useCallback(
     (lat: number, lng: number) => {
@@ -229,13 +290,21 @@ export default function HomeContent() {
     }
   }, [searchParams, messages, selectedMessage]);
 
+  // Fetch messages when viewport bounds change
   useEffect(() => {
-    fetchMessages();
+    if (viewportBounds) {
+      fetchMessages(viewportBounds);
+    }
+  }, [viewportBounds, fetchMessages]);
+
+  useEffect(() => {
+    // Don't fetch on mount - wait for viewport bounds
+    // fetchMessages() will be called when map bounds are available
 
     // Listen for message submission events
     const handleMessageSubmitted = () => {
       setTimeout(() => {
-        fetchMessages();
+        fetchMessages(viewportBounds);
       }, 2000);
     };
 
@@ -247,7 +316,7 @@ export default function HomeContent() {
         handleMessageSubmitted
       );
     };
-  }, [fetchMessages]);
+  }, [fetchMessages, viewportBounds]);
 
   // Interest management handlers
   const handleInterestClick = useCallback((interest: Interest) => {
@@ -386,24 +455,24 @@ export default function HomeContent() {
         className="relative"
         style={{ height: "calc(100vh - 120px)", minHeight: "500px" }}
       >
-        {isLoading ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
-            <p className="text-gray-600">Зареждане на картата...</p>
+        <MapContainer
+          messages={messages}
+          interests={interests}
+          user={user}
+          targetMode={targetMode}
+          initialMapCenter={initialMapCenter}
+          onFeatureClick={handleFeatureClick}
+          onMapReady={handleMapReady}
+          onBoundsChanged={handleBoundsChanged}
+          onInterestClick={handleInterestClick}
+          onSaveInterest={handleSaveInterest}
+          onCancelTargetMode={handleCancelTargetMode}
+          onStartAddInterest={handleStartAddInterest}
+        />
+        {isLoading && (
+          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-white px-4 py-2 rounded-lg shadow-md z-20">
+            <p className="text-sm text-gray-600">Зареждане...</p>
           </div>
-        ) : (
-          <MapContainer
-            messages={messages}
-            interests={interests}
-            user={user}
-            targetMode={targetMode}
-            initialMapCenter={initialMapCenter}
-            onFeatureClick={handleFeatureClick}
-            onMapReady={handleMapReady}
-            onInterestClick={handleInterestClick}
-            onSaveInterest={handleSaveInterest}
-            onCancelTargetMode={handleCancelTargetMode}
-            onStartAddInterest={handleStartAddInterest}
-          />
         )}
       </div>
 

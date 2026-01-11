@@ -3,6 +3,7 @@
 import React, { useCallback, useMemo, useRef } from "react";
 import { GoogleMap } from "@react-google-maps/api";
 import { Message, Interest } from "@/lib/types";
+import { SOFIA_BOUNDS } from "@/lib/bounds-utils";
 import GeoJSONLayer from "./GeoJSONLayer";
 import InterestCircles from "./InterestCircles";
 import InterestTargetMode from "./InterestTargetMode";
@@ -19,6 +20,12 @@ interface MapComponentProps {
     ) => void,
     mapInstance: google.maps.Map | null
   ) => void;
+  readonly onBoundsChanged?: (bounds: {
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+  }) => void;
   readonly interests?: Interest[];
   readonly onInterestClick?: (interest: Interest) => void;
   readonly targetMode?: {
@@ -38,20 +45,7 @@ interface MapComponentProps {
 // };
 const SOFIA_CENTER = { lat: 42.6977, lng: 23.3219 };
 
-// Bounds to restrict map panning
-// const OBORISHTE_BOUNDS = {
-//   north: 42.72,
-//   south: 42.67,
-//   east: 23.37,
-//   west: 23.31,
-// };
-const SOFIA_BOUNDS = {
-  // Also in ingest/lib/geocoding-utils.ts
-  south: 42.605,
-  west: 23.188,
-  north: 42.83,
-  east: 23.528,
-};
+// Bounds to restrict map panning (imported from @/lib/bounds-utils)
 
 const mapContainerStyle = {
   width: "100%",
@@ -103,6 +97,7 @@ export default function MapComponent({
   messages,
   onFeatureClick,
   onMapReady,
+  onBoundsChanged,
   interests = [],
   onInterestClick,
   targetMode,
@@ -204,6 +199,23 @@ export default function MapComponent({
     };
   }, []);
 
+  const handleBoundsChangedInternal = useCallback(() => {
+    if (!mapRef.current || !onBoundsChanged) return;
+
+    const bounds = mapRef.current.getBounds();
+    if (!bounds) return;
+
+    const ne = bounds.getNorthEast();
+    const sw = bounds.getSouthWest();
+
+    onBoundsChanged({
+      north: ne.lat(),
+      south: sw.lat(),
+      east: ne.lng(),
+      west: sw.lng(),
+    });
+  }, [onBoundsChanged]);
+
   return (
     <div className="absolute inset-0">
       {process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ? (
@@ -212,8 +224,13 @@ export default function MapComponent({
           options={dynamicMapOptions}
           onLoad={onMapLoad}
           onCenterChanged={handleCenterChanged}
+          onBoundsChanged={handleBoundsChangedInternal}
         >
-          <GeoJSONLayer messages={messages} onFeatureClick={onFeatureClick} />
+          <GeoJSONLayer
+            messages={messages}
+            onFeatureClick={onFeatureClick}
+            map={mapRef.current}
+          />
 
           {/* Render interest circles when not in target mode or when editing existing */}
           {interests.length > 0 && onInterestClick && (

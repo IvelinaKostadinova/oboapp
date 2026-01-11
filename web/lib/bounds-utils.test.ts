@@ -1,0 +1,296 @@
+import { describe, it, expect } from "vitest";
+import {
+  SOFIA_BOUNDS,
+  clampBounds,
+  addBuffer,
+  featureIntersectsBounds,
+  type ViewportBounds,
+} from "./bounds-utils";
+
+describe("bounds-utils", () => {
+  describe("SOFIA_BOUNDS", () => {
+    it("should have correct Sofia boundaries", () => {
+      expect(SOFIA_BOUNDS).toEqual({
+        south: 42.605,
+        west: 23.188,
+        north: 42.83,
+        east: 23.528,
+      });
+    });
+  });
+
+  describe("clampBounds", () => {
+    it("should not modify bounds already within Sofia", () => {
+      const bounds: ViewportBounds = {
+        north: 42.7,
+        south: 42.65,
+        east: 23.4,
+        west: 23.3,
+      };
+
+      const clamped = clampBounds(bounds);
+
+      expect(clamped).toEqual(bounds);
+    });
+
+    it("should clamp north boundary if too far north", () => {
+      const bounds: ViewportBounds = {
+        north: 43.0, // Beyond Sofia
+        south: 42.7,
+        east: 23.4,
+        west: 23.3,
+      };
+
+      const clamped = clampBounds(bounds);
+
+      expect(clamped.north).toBe(SOFIA_BOUNDS.north);
+      expect(clamped.south).toBe(bounds.south);
+    });
+
+    it("should clamp south boundary if too far south", () => {
+      const bounds: ViewportBounds = {
+        north: 42.7,
+        south: 42.5, // Beyond Sofia
+        east: 23.4,
+        west: 23.3,
+      };
+
+      const clamped = clampBounds(bounds);
+
+      expect(clamped.south).toBe(SOFIA_BOUNDS.south);
+      expect(clamped.north).toBe(bounds.north);
+    });
+
+    it("should clamp east boundary if too far east", () => {
+      const bounds: ViewportBounds = {
+        north: 42.7,
+        south: 42.65,
+        east: 23.6, // Beyond Sofia
+        west: 23.3,
+      };
+
+      const clamped = clampBounds(bounds);
+
+      expect(clamped.east).toBe(SOFIA_BOUNDS.east);
+      expect(clamped.west).toBe(bounds.west);
+    });
+
+    it("should clamp west boundary if too far west", () => {
+      const bounds: ViewportBounds = {
+        north: 42.7,
+        south: 42.65,
+        east: 23.4,
+        west: 23.1, // Beyond Sofia
+      };
+
+      const clamped = clampBounds(bounds);
+
+      expect(clamped.west).toBe(SOFIA_BOUNDS.west);
+      expect(clamped.east).toBe(bounds.east);
+    });
+
+    it("should clamp all boundaries if completely outside Sofia", () => {
+      const bounds: ViewportBounds = {
+        north: 45.0,
+        south: 44.0,
+        east: 25.0,
+        west: 24.0,
+      };
+
+      const clamped = clampBounds(bounds);
+
+      // When completely outside, south clamps up and north clamps down
+      // This results in inverted bounds (south > north)
+      expect(clamped.north).toBe(SOFIA_BOUNDS.north);
+      expect(clamped.south).toBe(44.0); // Can't clamp below original
+      expect(clamped.east).toBe(SOFIA_BOUNDS.east);
+      expect(clamped.west).toBe(24.0); // Can't clamp below original
+    });
+  });
+
+  describe("addBuffer", () => {
+    it("should add 20% buffer by default", () => {
+      const bounds: ViewportBounds = {
+        north: 42.7,
+        south: 42.65, // 0.05 lat range
+        east: 23.4,
+        west: 23.35, // 0.05 lng range
+      };
+
+      const buffered = addBuffer(bounds);
+
+      // 20% of 0.05 = 0.01
+      expect(buffered.north).toBeCloseTo(42.71, 5);
+      expect(buffered.south).toBeCloseTo(42.64, 5);
+      expect(buffered.east).toBeCloseTo(23.41, 5);
+      expect(buffered.west).toBeCloseTo(23.34, 5);
+    });
+
+    it("should add custom buffer percentage", () => {
+      const bounds: ViewportBounds = {
+        north: 42.7,
+        south: 42.65, // 0.05 lat range
+        east: 23.4,
+        west: 23.35, // 0.05 lng range
+      };
+
+      const buffered = addBuffer(bounds, 0.1); // 10% buffer
+
+      // 10% of 0.05 = 0.005
+      expect(buffered.north).toBeCloseTo(42.705, 5);
+      expect(buffered.south).toBeCloseTo(42.645, 5);
+      expect(buffered.east).toBeCloseTo(23.405, 5);
+      expect(buffered.west).toBeCloseTo(23.345, 5);
+    });
+
+    it("should clamp buffered bounds to Sofia boundaries", () => {
+      const bounds: ViewportBounds = {
+        north: 42.82, // Very close to Sofia north boundary
+        south: 42.72,
+        east: 23.52, // Very close to Sofia east boundary
+        west: 23.42,
+      };
+
+      const buffered = addBuffer(bounds, 0.2);
+
+      // Should not exceed Sofia bounds
+      expect(buffered.north).toBeLessThanOrEqual(SOFIA_BOUNDS.north);
+      expect(buffered.south).toBeGreaterThanOrEqual(SOFIA_BOUNDS.south);
+      expect(buffered.east).toBeLessThanOrEqual(SOFIA_BOUNDS.east);
+      expect(buffered.west).toBeGreaterThanOrEqual(SOFIA_BOUNDS.west);
+    });
+  });
+
+  describe("featureIntersectsBounds", () => {
+    const viewportBounds: ViewportBounds = {
+      north: 42.7,
+      south: 42.65,
+      east: 23.35,
+      west: 23.3,
+    };
+
+    it("should return true for Point inside bounds", () => {
+      const pointFeature = {
+        geometry: {
+          type: "Point",
+          coordinates: [23.32, 42.68], // [lng, lat] inside viewport
+        },
+      };
+
+      expect(featureIntersectsBounds(pointFeature, viewportBounds)).toBe(true);
+    });
+
+    it("should return false for Point outside bounds", () => {
+      const pointFeature = {
+        geometry: {
+          type: "Point",
+          coordinates: [23.4, 42.8], // [lng, lat] outside viewport
+        },
+      };
+
+      expect(featureIntersectsBounds(pointFeature, viewportBounds)).toBe(false);
+    });
+
+    it("should return true for LineString intersecting bounds", () => {
+      const lineFeature = {
+        geometry: {
+          type: "LineString",
+          coordinates: [
+            [23.25, 42.6], // Outside (west)
+            [23.32, 42.68], // Inside
+            [23.4, 42.75], // Outside (east)
+          ],
+        },
+      };
+
+      expect(featureIntersectsBounds(lineFeature, viewportBounds)).toBe(true);
+    });
+
+    it("should return false for LineString completely outside bounds", () => {
+      const lineFeature = {
+        geometry: {
+          type: "LineString",
+          coordinates: [
+            [23.4, 42.8],
+            [23.45, 42.85],
+          ],
+        },
+      };
+
+      expect(featureIntersectsBounds(lineFeature, viewportBounds)).toBe(false);
+    });
+
+    it("should return true for Polygon intersecting bounds", () => {
+      const polygonFeature = {
+        geometry: {
+          type: "Polygon",
+          coordinates: [
+            [
+              [23.29, 42.64], // SW corner (overlaps)
+              [23.36, 42.64], // SE corner (overlaps)
+              [23.36, 42.71], // NE corner (overlaps)
+              [23.29, 42.71], // NW corner (overlaps)
+              [23.29, 42.64], // Close the ring
+            ],
+          ],
+        },
+      };
+
+      expect(featureIntersectsBounds(polygonFeature, viewportBounds)).toBe(
+        true
+      );
+    });
+
+    it("should return false for Polygon completely outside bounds", () => {
+      const polygonFeature = {
+        geometry: {
+          type: "Polygon",
+          coordinates: [
+            [
+              [23.5, 42.8],
+              [23.6, 42.8],
+              [23.6, 42.9],
+              [23.5, 42.9],
+              [23.5, 42.8],
+            ],
+          ],
+        },
+      };
+
+      expect(featureIntersectsBounds(polygonFeature, viewportBounds)).toBe(
+        false
+      );
+    });
+
+    it("should return false for feature without coordinates", () => {
+      const invalidFeature = {
+        geometry: {
+          type: "Point",
+        },
+      };
+
+      expect(featureIntersectsBounds(invalidFeature, viewportBounds)).toBe(
+        false
+      );
+    });
+
+    it("should return false for feature without geometry", () => {
+      const invalidFeature = {};
+
+      expect(featureIntersectsBounds(invalidFeature, viewportBounds)).toBe(
+        false
+      );
+    });
+
+    it("should handle Point at viewport boundary as intersecting", () => {
+      const pointFeature = {
+        geometry: {
+          type: "Point",
+          coordinates: [23.3, 42.65], // Exactly on boundary
+        },
+      };
+
+      expect(featureIntersectsBounds(pointFeature, viewportBounds)).toBe(true);
+    });
+  });
+});
