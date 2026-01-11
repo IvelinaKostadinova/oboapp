@@ -1,0 +1,77 @@
+import { useState, useCallback, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+
+type CenterMapFn = (
+  lat: number,
+  lng: number,
+  zoom?: number,
+  options?: { animate?: boolean }
+) => void;
+
+/**
+ * Custom hook for managing map navigation and centering
+ *
+ * Handles:
+ * - URL-based map centering (from settings page zone clicks)
+ * - Map ready callback to receive centerMap function
+ * - Address click centering
+ * - Initial map center state
+ */
+export function useMapNavigation() {
+  const [initialMapCenter, setInitialMapCenter] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
+  const [centerMapFn, setCenterMapFn] = useState<CenterMapFn | null>(null);
+  const searchParams = useSearchParams();
+
+  // Handle URL-based map centering (from settings page zone clicks)
+  useEffect(() => {
+    const lat = searchParams.get("lat");
+    const lng = searchParams.get("lng");
+
+    if (lat && lng) {
+      const latitude = Number.parseFloat(lat);
+      const longitude = Number.parseFloat(lng);
+
+      if (!Number.isNaN(latitude) && !Number.isNaN(longitude)) {
+        setInitialMapCenter({ lat: latitude, lng: longitude });
+
+        // Clear query params after setting initial center
+        globalThis.history.replaceState({}, "", "/");
+      }
+    }
+  }, [searchParams]);
+
+  // Center map when initialMapCenter is set (from URL params)
+  useEffect(() => {
+    if (initialMapCenter && centerMapFn) {
+      centerMapFn(initialMapCenter.lat, initialMapCenter.lng, 16);
+    }
+  }, [initialMapCenter, centerMapFn]);
+
+  // Handle map ready - receive centerMap function and map instance
+  const handleMapReady = useCallback(
+    (centerMap: CenterMapFn, _map: google.maps.Map | null) => {
+      setCenterMapFn(() => centerMap);
+    },
+    []
+  );
+
+  // Handle address click - center map on coordinates
+  const handleAddressClick = useCallback(
+    (lat: number, lng: number) => {
+      if (centerMapFn) {
+        centerMapFn(lat, lng, 18);
+      }
+    },
+    [centerMapFn]
+  );
+
+  return {
+    initialMapCenter,
+    centerMapFn,
+    handleMapReady,
+    handleAddressClick,
+  };
+}

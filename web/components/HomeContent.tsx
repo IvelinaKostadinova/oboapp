@@ -2,17 +2,20 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { trackEvent } from "@/lib/analytics";
 import MapContainer from "@/components/MapContainer";
 import MessageDetailView from "@/components/MessageDetailView";
 import NotificationPrompt from "@/components/NotificationPrompt";
 import LoginPrompt from "@/components/LoginPrompt";
 import SubscribePrompt from "@/components/SubscribePrompt";
 import MessagesGrid from "@/components/MessagesGrid";
-import { Message, Interest } from "@/lib/types";
+import InterestContextMenu from "@/components/InterestContextMenu";
+import { Message } from "@/lib/types";
 import { useInterests } from "@/lib/hooks/useInterests";
 import { useNotificationPrompt } from "@/lib/hooks/useNotificationPrompt";
 import { useAuth } from "@/lib/auth-context";
+import { useMessages } from "@/lib/hooks/useMessages";
+import { useMapNavigation } from "@/lib/hooks/useMapNavigation";
+import { useInterestManagement } from "@/lib/hooks/useInterestManagement";
 
 /**
  * HomeContent - Main application component managing map, messages, and user interactions
@@ -28,55 +31,7 @@ import { useAuth } from "@/lib/auth-context";
  * This ensures the map is visible immediately while messages load based on viewport.
  */
 export default function HomeContent() {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
-  const [initialMapCenter, setInitialMapCenter] = useState<{
-    lat: number;
-    lng: number;
-  } | null>(null);
-  const [centerMapFn, setCenterMapFn] = useState<
-    | ((
-        lat: number,
-        lng: number,
-        zoom?: number,
-        options?: { animate?: boolean }
-      ) => void)
-    | null
-  >(null);
-
-  // Viewport bounds state for filtering messages
-  const [viewportBounds, setViewportBounds] = useState<{
-    north: number;
-    south: number;
-    east: number;
-    west: number;
-  } | null>(null);
-  const boundsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Interest management state
-  const [targetMode, setTargetMode] = useState<{
-    active: boolean;
-    initialRadius?: number;
-    editingInterestId?: string | null;
-  }>({ active: false });
-  const [selectedInterest, setSelectedInterest] = useState<Interest | null>(
-    null
-  );
-  const [interestMenuPosition, setInterestMenuPosition] = useState<{
-    x: number;
-    y: number;
-  } | null>(null);
-
-  const { interests, addInterest, updateInterest, deleteInterest } =
-    useInterests();
-
-  const { user } = useAuth();
-  const { showPrompt, onAccept, onDecline, checkAndPromptForNotifications } =
-    useNotificationPrompt();
-
-  // Subscribe prompt state
   const [showSubscribePrompt, setShowSubscribePrompt] = useState(false);
   const [hasCheckedSubscriptions, setHasCheckedSubscriptions] = useState(false);
 
@@ -84,30 +39,38 @@ export default function HomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Handle URL-based map centering (from settings page zone clicks)
-  useEffect(() => {
-    const lat = searchParams.get("lat");
-    const lng = searchParams.get("lng");
+  // Core hooks
+  const { interests, addInterest, updateInterest, deleteInterest } =
+    useInterests();
+  const { user } = useAuth();
+  const { showPrompt, onAccept, onDecline, checkAndPromptForNotifications } =
+    useNotificationPrompt();
 
-    if (lat && lng) {
-      const latitude = Number.parseFloat(lat);
-      const longitude = Number.parseFloat(lng);
+  // Message fetching and viewport management
+  const { messages, isLoading, error, handleBoundsChanged } = useMessages();
 
-      if (!Number.isNaN(latitude) && !Number.isNaN(longitude)) {
-        setInitialMapCenter({ lat: latitude, lng: longitude });
+  // Map navigation and centering
+  const { initialMapCenter, centerMapFn, handleMapReady, handleAddressClick } =
+    useMapNavigation();
 
-        // Clear query params after setting initial center
-        globalThis.history.replaceState({}, "", "/");
-      }
-    }
-  }, [searchParams]);
-
-  // Center map when initialMapCenter is set (from URL params)
-  useEffect(() => {
-    if (initialMapCenter && centerMapFn) {
-      centerMapFn(initialMapCenter.lat, initialMapCenter.lng, 16);
-    }
-  }, [initialMapCenter, centerMapFn]);
+  // Interest/zone management
+  const {
+    targetMode,
+    selectedInterest,
+    interestMenuPosition,
+    handleInterestClick,
+    handleMoveInterest,
+    handleDeleteInterest,
+    handleStartAddInterest,
+    handleSaveInterest,
+    handleCancelTargetMode,
+    handleCloseInterestMenu,
+  } = useInterestManagement(
+    centerMapFn,
+    addInterest,
+    updateInterest,
+    deleteInterest
+  );
 
   // Check for notification permission when user has circles
   useEffect(() => {
@@ -158,59 +121,6 @@ export default function HomeContent() {
     checkSubscriptions();
   }, [user, interests.length, hasCheckedSubscriptions, showPrompt]);
 
-  const fetchMessages = useCallback(
-    async (
-      bounds?: {
-        north: number;
-        south: number;
-        east: number;
-        west: number;
-      } | null
-    ) => {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        let url = "/api/messages";
-        if (bounds) {
-          const params = new URLSearchParams({
-            north: bounds.north.toString(),
-            south: bounds.south.toString(),
-            east: bounds.east.toString(),
-            west: bounds.west.toString(),
-          });
-          url += `?${params.toString()}`;
-        }
-
-        const response = await fetch(url);
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch messages");
-        }
-
-        const data = await response.json();
-        setMessages(data.messages || []);
-      } catch (err) {
-        // Check if it's a network error (offline)
-        if (!navigator.onLine) {
-          setError(
-            "Няма интернет връзка. Моля, свържете се към интернет и презаредете страницата."
-          );
-        } else if (err instanceof TypeError && err.message.includes("fetch")) {
-          setError(
-            "Не успях да заредя сигналите. Проверете интернет връзката си и презаредете страницата."
-          );
-        } else {
-          setError("Не успях да заредя сигналите. Презареди страницата.");
-        }
-        console.error("Error fetching messages:", err);
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    []
-  );
-
   // Handle feature click - update URL and select message
   const handleFeatureClick = useCallback(
     (messageId: string) => {
@@ -231,48 +141,6 @@ export default function HomeContent() {
     router.push("/", { scroll: false });
   }, [router]);
 
-  // Handle map ready - receive centerMap function and map instance
-  const handleMapReady = useCallback(
-    (
-      centerMap: (
-        lat: number,
-        lng: number,
-        zoom?: number,
-        options?: { animate?: boolean }
-      ) => void,
-      _map: google.maps.Map | null
-    ) => {
-      setCenterMapFn(() => centerMap);
-    },
-    []
-  );
-
-  // Handle map bounds change - debounced at 300ms
-  const handleBoundsChanged = useCallback(
-    (bounds: { north: number; south: number; east: number; west: number }) => {
-      // Clear existing timeout
-      if (boundsTimeoutRef.current) {
-        clearTimeout(boundsTimeoutRef.current);
-      }
-
-      // Set new timeout for debounced fetch
-      boundsTimeoutRef.current = setTimeout(() => {
-        setViewportBounds(bounds);
-      }, 300);
-    },
-    []
-  );
-
-  // Handle address click - center map on coordinates
-  const handleAddressClick = useCallback(
-    (lat: number, lng: number) => {
-      if (centerMapFn) {
-        centerMapFn(lat, lng, 18);
-      }
-    },
-    [centerMapFn]
-  );
-
   // Sync selected message with URL parameter
   useEffect(() => {
     const messageId = searchParams.get("messageId");
@@ -289,153 +157,6 @@ export default function HomeContent() {
       setSelectedMessage(null);
     }
   }, [searchParams, messages, selectedMessage]);
-
-  // Fetch messages when viewport bounds change
-  useEffect(() => {
-    if (viewportBounds) {
-      fetchMessages(viewportBounds);
-    }
-  }, [viewportBounds, fetchMessages]);
-
-  useEffect(() => {
-    // Don't fetch on mount - wait for viewport bounds
-    // fetchMessages() will be called when map bounds are available
-
-    // Listen for message submission events
-    const handleMessageSubmitted = () => {
-      setTimeout(() => {
-        fetchMessages(viewportBounds);
-      }, 2000);
-    };
-
-    globalThis.addEventListener("messageSubmitted", handleMessageSubmitted);
-
-    return () => {
-      globalThis.removeEventListener(
-        "messageSubmitted",
-        handleMessageSubmitted
-      );
-    };
-  }, [fetchMessages, viewportBounds]);
-
-  // Interest management handlers
-  const handleInterestClick = useCallback((interest: Interest) => {
-    setSelectedInterest(interest);
-    // Show context menu at cursor position
-    // For simplicity, we'll use a fixed position relative to viewport
-    setInterestMenuPosition({
-      x: window.innerWidth / 2,
-      y: window.innerHeight / 2,
-    });
-  }, []);
-
-  const handleMoveInterest = useCallback(() => {
-    if (!selectedInterest || !centerMapFn) return;
-
-    trackEvent({
-      name: "zone_move_initiated",
-      params: {
-        zone_id: selectedInterest.id || "unknown",
-        current_radius: selectedInterest.radius,
-      },
-    });
-
-    // Center map on the interest
-    centerMapFn(
-      selectedInterest.coordinates.lat,
-      selectedInterest.coordinates.lng,
-      17,
-      { animate: false }
-    );
-
-    // Enter target mode with the interest being edited
-    setTargetMode({
-      active: true,
-      initialRadius: selectedInterest.radius,
-      editingInterestId: selectedInterest.id,
-    });
-
-    // Close menu
-    setInterestMenuPosition(null);
-    setSelectedInterest(null);
-  }, [selectedInterest, centerMapFn]);
-
-  const handleDeleteInterest = useCallback(async () => {
-    if (!selectedInterest?.id) return;
-
-    try {
-      trackEvent({
-        name: "zone_deleted",
-        params: {
-          zone_id: selectedInterest.id,
-          radius: selectedInterest.radius,
-        },
-      });
-      await deleteInterest(selectedInterest.id);
-      setInterestMenuPosition(null);
-      setSelectedInterest(null);
-    } catch (error) {
-      console.error("Failed to delete interest:", error);
-
-      // Check if it's a 404 (already deleted, likely a duplicate)
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes("404")) {
-        console.warn(
-          "Interest already deleted (likely a duplicate), removing from local state"
-        );
-        setInterestMenuPosition(null);
-        setSelectedInterest(null);
-        // Refresh to sync state
-        globalThis.location.reload();
-      } else {
-        alert("Не успях да изтрия зоната. Опитай пак.");
-      }
-    }
-  }, [selectedInterest, deleteInterest]);
-
-  const handleStartAddInterest = useCallback(() => {
-    setTargetMode({
-      active: true,
-      initialRadius: 500,
-      editingInterestId: null,
-    });
-  }, []);
-
-  const handleSaveInterest = useCallback(
-    (coordinates: { lat: number; lng: number }, radius: number) => {
-      (async () => {
-        try {
-          if (targetMode.editingInterestId) {
-            // Update existing interest
-            await updateInterest(targetMode.editingInterestId, {
-              coordinates,
-              radius,
-            });
-          } else {
-            // Add new interest
-            await addInterest(coordinates, radius);
-          }
-
-          // Exit target mode
-          setTargetMode({ active: false });
-        } catch (error) {
-          console.error("Failed to save interest:", error);
-          alert("Не успях да запазя зоната. Опитай пак.");
-        }
-      })();
-    },
-    [targetMode.editingInterestId, addInterest, updateInterest]
-  );
-
-  const handleCancelTargetMode = useCallback(() => {
-    setTargetMode({ active: false });
-  }, []);
-
-  const handleCloseInterestMenu = useCallback(() => {
-    setInterestMenuPosition(null);
-    setSelectedInterest(null);
-  }, []);
 
   return (
     <div className="flex-1 flex flex-col overflow-y-auto" ref={containerRef}>
@@ -495,59 +216,13 @@ export default function HomeContent() {
 
       {/* Interest Context Menu */}
       {interestMenuPosition && selectedInterest && (
-        <>
-          {/* Backdrop to close menu */}
-          <button
-            type="button"
-            className="fixed inset-0 z-40 bg-transparent cursor-default"
-            onClick={handleCloseInterestMenu}
-            aria-label="Затвори менюто"
-          />
-          {/* Menu */}
-          <div
-            className="fixed z-50 bg-white rounded-lg shadow-xl border border-gray-200 py-1 min-w-[150px]"
-            style={{
-              left: `${interestMenuPosition.x}px`,
-              top: `${interestMenuPosition.y}px`,
-              transform: "translate(-50%, -50%)",
-            }}
-          >
-            <button
-              onClick={handleMoveInterest}
-              className="w-full px-4 py-2 text-sm text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
-              </svg>
-              Премести
-            </button>
-            <button
-              onClick={handleDeleteInterest}
-              className="w-full px-4 py-2 text-sm text-left text-red-600 hover:bg-red-50 flex items-center gap-2"
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-              </svg>
-              Изтрий
-            </button>
-          </div>
-        </>
+        <InterestContextMenu
+          interest={selectedInterest}
+          position={interestMenuPosition}
+          onMove={handleMoveInterest}
+          onDelete={handleDeleteInterest}
+          onClose={handleCloseInterestMenu}
+        />
       )}
 
       {/* Notification permission prompt */}

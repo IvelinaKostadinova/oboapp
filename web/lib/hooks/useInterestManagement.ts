@@ -1,0 +1,176 @@
+import { useState, useCallback } from "react";
+import { trackEvent } from "@/lib/analytics";
+import { Interest } from "@/lib/types";
+
+type CenterMapFn = (
+  lat: number,
+  lng: number,
+  zoom?: number,
+  options?: { animate?: boolean }
+) => void;
+
+interface TargetMode {
+  active: boolean;
+  initialRadius?: number;
+  editingInterestId?: string | null;
+}
+
+/**
+ * Custom hook for managing interest/zone operations
+ *
+ * Handles:
+ * - Interest selection and context menu
+ * - Target mode for adding/editing interests
+ * - Move, delete, save, cancel operations
+ */
+export function useInterestManagement(
+  centerMapFn: CenterMapFn | null,
+  addInterest: (
+    coordinates: { lat: number; lng: number },
+    radius: number
+  ) => Promise<void>,
+  updateInterest: (
+    id: string,
+    updates: { coordinates?: { lat: number; lng: number }; radius?: number }
+  ) => Promise<void>,
+  deleteInterest: (id: string) => Promise<void>
+) {
+  const [targetMode, setTargetMode] = useState<TargetMode>({ active: false });
+  const [selectedInterest, setSelectedInterest] = useState<Interest | null>(
+    null
+  );
+  const [interestMenuPosition, setInterestMenuPosition] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+
+  const handleInterestClick = useCallback((interest: Interest) => {
+    setSelectedInterest(interest);
+    // Show context menu at center of viewport
+    setInterestMenuPosition({
+      x: window.innerWidth / 2,
+      y: window.innerHeight / 2,
+    });
+  }, []);
+
+  const handleMoveInterest = useCallback(() => {
+    if (!selectedInterest || !centerMapFn) return;
+
+    trackEvent({
+      name: "zone_move_initiated",
+      params: {
+        zone_id: selectedInterest.id || "unknown",
+        current_radius: selectedInterest.radius,
+      },
+    });
+
+    // Center map on the interest
+    centerMapFn(
+      selectedInterest.coordinates.lat,
+      selectedInterest.coordinates.lng,
+      17,
+      { animate: false }
+    );
+
+    // Enter target mode with the interest being edited
+    setTargetMode({
+      active: true,
+      initialRadius: selectedInterest.radius,
+      editingInterestId: selectedInterest.id,
+    });
+
+    // Close menu
+    setInterestMenuPosition(null);
+    setSelectedInterest(null);
+  }, [selectedInterest, centerMapFn]);
+
+  const handleDeleteInterest = useCallback(async () => {
+    if (!selectedInterest?.id) return;
+
+    try {
+      trackEvent({
+        name: "zone_deleted",
+        params: {
+          zone_id: selectedInterest.id,
+          radius: selectedInterest.radius,
+        },
+      });
+      await deleteInterest(selectedInterest.id);
+      setInterestMenuPosition(null);
+      setSelectedInterest(null);
+    } catch (error) {
+      console.error("Failed to delete interest:", error);
+
+      // Check if it's a 404 (already deleted, likely a duplicate)
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes("404")) {
+        console.warn(
+          "Interest already deleted (likely a duplicate), removing from local state"
+        );
+        setInterestMenuPosition(null);
+        setSelectedInterest(null);
+        // Refresh to sync state
+        globalThis.location.reload();
+      } else {
+        alert("Не успях да изтрия зоната. Опитай пак.");
+      }
+    }
+  }, [selectedInterest, deleteInterest]);
+
+  const handleStartAddInterest = useCallback(() => {
+    setTargetMode({
+      active: true,
+      initialRadius: 500,
+      editingInterestId: null,
+    });
+  }, []);
+
+  const handleSaveInterest = useCallback(
+    (coordinates: { lat: number; lng: number }, radius: number) => {
+      (async () => {
+        try {
+          if (targetMode.editingInterestId) {
+            // Update existing interest
+            await updateInterest(targetMode.editingInterestId, {
+              coordinates,
+              radius,
+            });
+          } else {
+            // Add new interest
+            await addInterest(coordinates, radius);
+          }
+
+          // Exit target mode
+          setTargetMode({ active: false });
+        } catch (error) {
+          console.error("Failed to save interest:", error);
+          alert("Не успях да запазя зоната. Опитай пак.");
+        }
+      })();
+    },
+    [targetMode.editingInterestId, addInterest, updateInterest]
+  );
+
+  const handleCancelTargetMode = useCallback(() => {
+    setTargetMode({ active: false });
+  }, []);
+
+  const handleCloseInterestMenu = useCallback(() => {
+    setInterestMenuPosition(null);
+    setSelectedInterest(null);
+  }, []);
+
+  return {
+    targetMode,
+    selectedInterest,
+    interestMenuPosition,
+    handleInterestClick,
+    handleMoveInterest,
+    handleDeleteInterest,
+    handleStartAddInterest,
+    handleSaveInterest,
+    handleCancelTargetMode,
+    handleCloseInterestMenu,
+  };
+}
