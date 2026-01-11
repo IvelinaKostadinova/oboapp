@@ -79,7 +79,7 @@ function isMessageRelevant(message: Message, cutoffDate: Date): boolean {
 
 export async function GET(request: Request) {
   try {
-    // Parse viewport bounds from query params
+    // Parse viewport bounds and zoom from query params
     const { searchParams } = new URL(request.url);
     const boundsParam = {
       north: searchParams.get("north"),
@@ -87,6 +87,8 @@ export async function GET(request: Request) {
       east: searchParams.get("east"),
       west: searchParams.get("west"),
     };
+    const zoomParam = searchParams.get("zoom");
+    const zoom = zoomParam ? Number.parseFloat(zoomParam) : undefined;
 
     let viewportBounds: ViewportBounds | null = null;
     if (
@@ -163,6 +165,64 @@ export async function GET(request: Request) {
         return message.geoJson.features.some((feature) =>
           featureIntersectsBounds(feature, viewportBounds)
         );
+      });
+    }
+
+    // Simplify geometry to centroids for zoom levels < 15 (for clustering)
+    if (zoom !== undefined && zoom < 15) {
+      messages = messages.map((message) => {
+        if (!message.geoJson?.features) return message;
+
+        const simplifiedFeatures = message.geoJson.features.map((feature) => {
+          // Only simplify LineString and Polygon to Points
+          if (
+            feature.geometry.type === "LineString" ||
+            feature.geometry.type === "Polygon"
+          ) {
+            // Calculate centroid
+            let centroid: [number, number];
+            if (feature.geometry.type === "LineString") {
+              const coords = feature.geometry.coordinates as [number, number][];
+              const avgLng =
+                coords.reduce((sum, c) => sum + c[0], 0) / coords.length;
+              const avgLat =
+                coords.reduce((sum, c) => sum + c[1], 0) / coords.length;
+              centroid = [avgLng, avgLat];
+            } else {
+              // Polygon
+              const coords = feature.geometry.coordinates[0] as [
+                number,
+                number
+              ][];
+              const avgLng =
+                coords.reduce((sum, c) => sum + c[0], 0) / coords.length;
+              const avgLat =
+                coords.reduce((sum, c) => sum + c[1], 0) / coords.length;
+              centroid = [avgLng, avgLat];
+            }
+
+            return {
+              ...feature,
+              geometry: {
+                type: "Point" as const,
+                coordinates: centroid,
+              },
+              properties: {
+                ...feature.properties,
+                _originalGeometryType: feature.geometry.type,
+              },
+            } as typeof feature;
+          }
+          return feature;
+        });
+
+        return {
+          ...message,
+          geoJson: {
+            ...message.geoJson,
+            features: simplifiedFeatures,
+          },
+        };
       });
     }
 

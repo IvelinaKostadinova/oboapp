@@ -17,6 +17,7 @@ export interface ViewportBounds {
   south: number;
   east: number;
   west: number;
+  zoom?: number; // Optional for backward compatibility
 }
 
 /**

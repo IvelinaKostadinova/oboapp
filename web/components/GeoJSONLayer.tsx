@@ -13,6 +13,7 @@ interface GeoJSONLayerProps {
   readonly messages: Message[];
   readonly onFeatureClick?: (messageId: string) => void;
   readonly map?: google.maps.Map | null;
+  readonly currentZoom: number;
 }
 
 const GEOJSON_STYLES = {
@@ -97,9 +98,13 @@ export default function GeoJSONLayer({
   messages,
   onFeatureClick,
   map,
+  currentZoom,
 }: GeoJSONLayerProps) {
   const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
   const [hoveredFeature, setHoveredFeature] = useState<string | null>(null);
+  const [unclusteredFeatures, setUnclusteredFeatures] = useState<Set<string>>(
+    new Set()
+  );
   const clustererRef = useRef<MarkerClusterer | null>(null);
   const markersRef = useRef<Map<string, google.maps.Marker>>(new Map());
 
@@ -206,14 +211,29 @@ export default function GeoJSONLayer({
 
     // Create clusterer with aggressive clustering settings
     if (markers.length > 0) {
-      clustererRef.current = new MarkerClusterer({
+      const clusterer = new MarkerClusterer({
         map: map,
         markers,
         algorithmOptions: {
-          maxZoom: 17, // Cluster until zoom level 17 (was 15)
+          maxZoom: 17, // Cluster until zoom level 17
         },
         renderer: {
-          render: ({ count, position }) => {
+          render: ({ count, position, markers: clusterMarkers }) => {
+            // When rendering, track which markers are in this cluster
+            if (count > 1) {
+              // This is a real cluster - hide full geometry for these features
+              clusterMarkers?.forEach((marker) => {
+                const key = (marker as any).featureKey;
+                if (key) {
+                  setUnclusteredFeatures((prev) => {
+                    const next = new Set(prev);
+                    next.delete(key);
+                    return next;
+                  });
+                }
+              });
+            }
+
             // Create red cluster marker matching our pin color
             return new google.maps.Marker({
               position,
@@ -223,7 +243,7 @@ export default function GeoJSONLayer({
                 fillOpacity: 0.9,
                 strokeColor: colors.map.stroke,
                 strokeWeight: 2,
-                scale: Math.min(15 + count / 2, 25), // Size scales with count, max 25
+                scale: Math.min(15 + count / 2, 25),
               },
               label: {
                 text: String(count),
@@ -236,6 +256,23 @@ export default function GeoJSONLayer({
           },
         },
       });
+
+      clustererRef.current = clusterer;
+
+      // Initialize all features as unclustered, then renderer will remove clustered ones
+      const allKeys = new Set(markersRef.current.keys());
+      setUnclusteredFeatures(allKeys);
+
+      // Listen to map zoom/bounds changes to update unclustered state
+      const updateUnclusteredState = () => {
+        setTimeout(() => {
+          const allKeys = new Set(markersRef.current.keys());
+          setUnclusteredFeatures(allKeys);
+        }, 100); // Small delay to let clusterer finish rendering
+      };
+
+      map.addListener("zoom_changed", updateUnclusteredState);
+      map.addListener("bounds_changed", updateUnclusteredState);
     }
 
     return () => {
@@ -256,30 +293,83 @@ export default function GeoJSONLayer({
       )
     : null;
 
+  // Get unclustered feature data for rendering full geometry
+  // Only show full geometry at high zoom levels (>=15) to avoid visual clutter
+  const shouldShowFullGeometry = currentZoom >= 15;
+  const unclusteredFeatureData = shouldShowFullGeometry
+    ? features.filter((f) =>
+        unclusteredFeatures.has(`${f.messageId}-${f.featureIndex}`)
+      )
+    : [];
+
   return (
     <>
-      {selectedFeatureData && (
-        <>
-          {selectedFeatureData.geometry.type === "LineString" && (
+      {/* Render full geometry for unclustered features (not in clusters) only at high zoom */}
+      {unclusteredFeatureData.map((feature) => {
+        const key = `${feature.messageId}-${feature.featureIndex}`;
+        const isHovered = hoveredFeature === key;
+        const isSelected = selectedFeature === key;
+
+        if (feature.geometry.type === "LineString") {
+          return (
             <Polyline
-              path={selectedFeatureData.geometry.coordinates.map(toLatLng)}
+              key={key}
+              path={feature.geometry.coordinates.map(toLatLng)}
               options={{
-                ...GEOJSON_STYLES.lineStringHover,
+                ...(isSelected || isHovered
+                  ? GEOJSON_STYLES.lineStringHover
+                  : GEOJSON_STYLES.lineString),
                 clickable: false,
               }}
             />
-          )}
-          {selectedFeatureData.geometry.type === "Polygon" && (
+          );
+        }
+
+        if (feature.geometry.type === "Polygon") {
+          return (
             <Polygon
-              paths={selectedFeatureData.geometry.coordinates[0].map(toLatLng)}
+              key={key}
+              paths={feature.geometry.coordinates[0].map(toLatLng)}
               options={{
-                ...GEOJSON_STYLES.polygonHover,
+                ...(isSelected || isHovered
+                  ? GEOJSON_STYLES.polygonHover
+                  : GEOJSON_STYLES.polygon),
                 clickable: false,
               }}
             />
-          )}
-        </>
-      )}
+          );
+        }
+
+        return null;
+      })}
+
+      {/* Also render selected feature if it's different from unclustered ones and zoom is high enough */}
+      {shouldShowFullGeometry &&
+        selectedFeatureData &&
+        !unclusteredFeatures.has(selectedFeature!) && (
+          <>
+            {selectedFeatureData.geometry.type === "LineString" && (
+              <Polyline
+                path={selectedFeatureData.geometry.coordinates.map(toLatLng)}
+                options={{
+                  ...GEOJSON_STYLES.lineStringHover,
+                  clickable: false,
+                }}
+              />
+            )}
+            {selectedFeatureData.geometry.type === "Polygon" && (
+              <Polygon
+                paths={selectedFeatureData.geometry.coordinates[0].map(
+                  toLatLng
+                )}
+                options={{
+                  ...GEOJSON_STYLES.polygonHover,
+                  clickable: false,
+                }}
+              />
+            )}
+          </>
+        )}
     </>
   );
 }

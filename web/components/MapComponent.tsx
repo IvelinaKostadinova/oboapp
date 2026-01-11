@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useMemo, useRef } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import { GoogleMap } from "@react-google-maps/api";
 import { Message, Interest } from "@/lib/types";
 import { SOFIA_BOUNDS } from "@/lib/bounds-utils";
@@ -25,6 +25,7 @@ interface MapComponentProps {
     south: number;
     east: number;
     west: number;
+    zoom: number;
   }) => void;
   readonly interests?: Interest[];
   readonly onInterestClick?: (interest: Interest) => void;
@@ -105,7 +106,7 @@ export default function MapComponent({
 }: MapComponentProps) {
   const mapRef = useRef<google.maps.Map | null>(null);
   const latestCenterRef = useRef(SOFIA_CENTER);
-
+  const [currentZoom, setCurrentZoom] = useState<number>(14);
   const mapOptions: google.maps.MapOptions = useMemo(
     () => ({
       zoom: 14,
@@ -203,7 +204,10 @@ export default function MapComponent({
     if (!mapRef.current || !onBoundsChanged) return;
 
     const bounds = mapRef.current.getBounds();
-    if (!bounds) return;
+    const zoom = mapRef.current.getZoom();
+    if (!bounds || zoom === undefined) return;
+
+    setCurrentZoom(zoom);
 
     const ne = bounds.getNorthEast();
     const sw = bounds.getSouthWest();
@@ -213,6 +217,7 @@ export default function MapComponent({
       south: sw.lat(),
       east: ne.lng(),
       west: sw.lng(),
+      zoom,
     });
   }, [onBoundsChanged]);
 
@@ -230,10 +235,11 @@ export default function MapComponent({
             messages={messages}
             onFeatureClick={onFeatureClick}
             map={mapRef.current}
+            currentZoom={currentZoom}
           />
 
-          {/* Render interest circles when not in target mode or when editing existing */}
-          {interests.length > 0 && onInterestClick && (
+          {/* Render interest circles */}
+          {interests && interests.length > 0 && onInterestClick && (
             <InterestCircles
               interests={interests}
               onInterestClick={onInterestClick}

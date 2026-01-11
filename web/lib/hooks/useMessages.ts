@@ -7,6 +7,7 @@ interface ViewportBounds {
   south: number;
   east: number;
   west: number;
+  zoom: number;
 }
 
 /**

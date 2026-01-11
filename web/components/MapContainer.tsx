@@ -28,6 +28,7 @@ interface MapContainerProps {
     south: number;
     east: number;
     west: number;
+    zoom: number;
   }) => void;
   readonly onInterestClick: (interest: Interest) => void;
   readonly onSaveInterest: (
