@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
+import { resolve } from "node:path";
+import dotenv from "dotenv";
+import { verifyEnvSet } from "@/lib/verify-env";
 
 const program = new Command();
 
@@ -35,6 +38,16 @@ Examples:
 `
   )
   .action(async (options) => {
+    // Ensure environment variables are loaded and required keys are present
+    dotenv.config({ path: resolve(process.cwd(), ".env.local") });
+    verifyEnvSet([
+      "FIREBASE_SERVICE_ACCOUNT_KEY",
+      "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
+      "GOOGLE_AI_API_KEY",
+      "GOOGLE_AI_MODEL",
+      "NEXT_PUBLIC_GOOGLE_MAPS_API_KEY",
+    ]);
+
     try {
       // Dynamically import to avoid loading dependencies at parse time
       const { ingest } = await import("./messageIngest/from-sources");

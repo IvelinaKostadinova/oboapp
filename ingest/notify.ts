@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
+import { resolve } from "node:path";
+import dotenv from "dotenv";
+import { verifyEnvSet } from "@/lib/verify-env";
 
 const program = new Command();
 
@@ -24,6 +27,14 @@ Examples:
 `
   )
   .action(async () => {
+    // Ensure environment variables are loaded and required keys are present
+    dotenv.config({ path: resolve(process.cwd(), ".env.local") });
+    verifyEnvSet([
+      "FIREBASE_SERVICE_ACCOUNT_KEY",
+      "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
+      "NEXT_PUBLIC_APP_URL",
+    ]);
+
     try {
       // Dynamically import to avoid loading dependencies at parse time
       const { main } = await import("./notifications/match-and-notify");
