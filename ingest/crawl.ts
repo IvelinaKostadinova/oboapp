@@ -2,7 +2,9 @@
 
 import { Command } from "commander";
 import { readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import dotenv from "dotenv";
+import { verifyEnvSet } from "@/lib/verify-env";
 
 const program = new Command();
 
@@ -39,6 +41,10 @@ Examples:
 `
   )
   .action(async (options) => {
+    // Ensure environment variables are loaded and required keys are present
+    dotenv.config({ path: resolve(process.cwd(), ".env.local") });
+    verifyEnvSet(["FIREBASE_SERVICE_ACCOUNT_KEY"]);
+
     const availableSources = getAvailableSources();
 
     // Validate source
