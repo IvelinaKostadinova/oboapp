@@ -99,17 +99,17 @@ jobs:
         run: |
           set -e  # Exit on error
           cd ingest
-          IMAGE_TAG="${GITHUB_SHA::8}"
+          IMAGE_TAG="latest"
           REGISTRY_URL="europe-west1-docker.pkg.dev/$PROJECT_ID/oborishte-ingest"
 
-          # Build and push with commit SHA
+          # Build and push with latest tag
           echo "========================================="
           echo "Building image for commit: $GITHUB_SHA"
           echo "Image tag: $IMAGE_TAG"
           echo "Full image: $REGISTRY_URL/$IMAGE_NAME:$IMAGE_TAG"
           echo "========================================="
 
-          # Submit build with the commit SHA tag
+          # Submit build with the latest tag
           if gcloud builds submit --tag $REGISTRY_URL/$IMAGE_NAME:$IMAGE_TAG .; then
             echo "========================================="
             echo "✅ Image built and tagged as $IMAGE_TAG"
@@ -123,41 +123,11 @@ jobs:
           echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
           echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-          # Wait for GCR to fully propagate
+          # Wait for registry to fully propagate
           echo "Waiting for registry to propagate..."
-          sleep 15
+          sleep 10
 
-          # Verify image exists with the specific tag
-          echo "Verifying image with tag $IMAGE_TAG in registry..."
-          MAX_RETRIES=6
-          RETRY_COUNT=0
-          IMAGE_FOUND=false
-
-          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-            if gcloud artifacts docker images describe $REGISTRY_URL/$IMAGE_NAME:$IMAGE_TAG --format="value(image_summary.digest)" 2>/dev/null; then
-              echo "✅ Image $REGISTRY_URL/$IMAGE_NAME:$IMAGE_TAG verified in registry"
-              IMAGE_FOUND=true
-              break
-            else
-              RETRY_COUNT=$((RETRY_COUNT + 1))
-              if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
-                echo "Image not ready yet, waiting... (attempt $RETRY_COUNT/$MAX_RETRIES)"
-                sleep 10
-              fi
-            fi
-          done
-
-          if [ "$IMAGE_FOUND" = false ]; then
-            echo "❌ ERROR: Image with tag $IMAGE_TAG not found after $MAX_RETRIES attempts"
-            echo "Listing all tags in registry:"
-            gcloud artifacts docker images list $REGISTRY_URL/$IMAGE_NAME --limit=10
-            exit 1
-          fi
-
-          # List recent images
-          echo ""
-          echo "Recent images in registry:"
-          gcloud artifacts docker images list $REGISTRY_URL/$IMAGE_NAME --limit=10
+          echo "✅ Build completed successfully"
 
       - name: Grant Artifact Registry access to Cloud Run service account
         run: |
@@ -183,8 +153,8 @@ jobs:
           cd ingest/terraform
 
           # Debug: Show what IMAGE_TAG we're using
-          echo "Using IMAGE_TAG: ${IMAGE_TAG:-NOT_SET}"
-          echo "Using image: gcr.io/$PROJECT_ID/$IMAGE_NAME:${IMAGE_TAG}"
+          echo "Using IMAGE_TAG: ${IMAGE_TAG}"
+          echo "Using image: europe-west1-docker.pkg.dev/$PROJECT_ID/oborishte-ingest/$IMAGE_NAME:${IMAGE_TAG}"
 
           terraform plan \
             -var="project_id=$PROJECT_ID" \
@@ -201,5 +171,6 @@ jobs:
       - name: Output deployment info
         run: |
           echo "✅ Deployment successful!"
-          echo "Image: europe-west1-docker.pkg.dev/$PROJECT_ID/oborishte-ingest/$IMAGE_NAME:$IMAGE_TAG"
+          echo "Image: europe-west1-docker.pkg.dev/$PROJECT_ID/oborishte-ingest/$IMAGE_NAME:latest"
           echo "Region: $REGION"
+          echo "Commit: $GITHUB_SHA"
