@@ -520,5 +520,118 @@ describe("message-classification", () => {
 
       expect(classifyMessage(message)).toBe("active" as MessageClassification);
     });
+
+    it("should classify as active when latest timespan is in the future", () => {
+      const message: Message = {
+        id: "test-1",
+        text: "Test message",
+        source: "test",
+        createdAt: new Date("2024-01-14T10:00:00.000Z"),
+        extractedData: {
+          responsible_entity: "Test Entity",
+          pins: [
+            {
+              address: "Test Address",
+              timespans: [
+                { start: "16.01.2024 12:00", end: "16.01.2024 14:00" }, // Tomorrow
+              ],
+            },
+          ],
+          streets: [],
+        },
+      };
+
+      expect(classifyMessage(message)).toBe("active" as MessageClassification);
+    });
+
+    it("should classify as active when latest timespan is multiple days in the future", () => {
+      const message: Message = {
+        id: "test-1",
+        text: "Test message",
+        source: "test",
+        createdAt: new Date("2024-01-14T10:00:00.000Z"),
+        extractedData: {
+          responsible_entity: "Test Entity",
+          streets: [
+            {
+              street: "ул. Тест",
+              from: "начало",
+              to: "край",
+              timespans: [
+                { start: "21.01.2024 09:00", end: "21.01.2024 16:00" }, // Future
+                { start: "22.01.2024 09:00", end: "22.01.2024 16:00" }, // Future - latest
+              ],
+            },
+          ],
+          pins: [],
+        },
+      };
+
+      expect(classifyMessage(message)).toBe("active" as MessageClassification);
+    });
+
+    it("should classify as active when has mixed past and future timespans", () => {
+      const message: Message = {
+        id: "test-1",
+        text: "Test message",
+        source: "test",
+        createdAt: new Date("2024-01-14T10:00:00.000Z"),
+        extractedData: {
+          responsible_entity: "Test Entity",
+          pins: [
+            {
+              address: "Test Address 1",
+              timespans: [
+                { start: "14.01.2024 12:00", end: "14.01.2024 14:00" }, // Yesterday
+              ],
+            },
+          ],
+          streets: [
+            {
+              street: "ул. Тест",
+              from: "начало",
+              to: "край",
+              timespans: [
+                { start: "16.01.2024 09:00", end: "16.01.2024 16:00" }, // Tomorrow - latest
+              ],
+            },
+          ],
+        },
+      };
+
+      expect(classifyMessage(message)).toBe("active" as MessageClassification);
+    });
+
+    it("should classify as active for the user's reported case (21-22 January 2026)", () => {
+      // Set mock time to January 16, 2026 (the current date according to user's report)
+      vi.setSystemTime(new Date("2026-01-16T10:00:00.000Z"));
+
+      const message: Message = {
+        id: "test-reported-case",
+        text: "ул. Св. Св. Кирил и Методий\nОт: ул. Дунав → До: ул. 11-ти август",
+        source: "test",
+        createdAt: new Date("2026-01-14T10:00:00.000Z"),
+        extractedData: {
+          responsible_entity: "Test Entity",
+          streets: [
+            {
+              street: "ул. Св. Св. Кирил и Методий",
+              from: "ул. Дунав",
+              to: "ул. 11-ти август",
+              timespans: [
+                { start: "21.01.2026 09:00", end: "21.01.2026 16:00" },
+                { start: "22.01.2026 09:00", end: "22.01.2026 16:00" }, // Latest
+              ],
+            },
+          ],
+          pins: [],
+        },
+      };
+
+      expect(classifyMessage(message)).toBe("active" as MessageClassification);
+
+      // Reset to original test time
+      vi.setSystemTime(new Date("2024-01-15T10:00:00.000Z"));
+    });
   });
 });

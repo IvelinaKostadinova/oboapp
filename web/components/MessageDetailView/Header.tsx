@@ -43,7 +43,7 @@ export default function Header({
           className={`w-3 h-3 rounded-full ${
             isActive ? "bg-destructive" : "bg-neutral"
           }`}
-          title={isActive ? "Активно днес" : "Архивирано"}
+          title={isActive ? "Активно" : "Минало"}
         />
         Детайли за сигнала
       </h2>

@@ -135,12 +135,12 @@ export function getLatestTimespanEndDate(message: Message): Date | null {
 }
 
 /**
- * Classify a message as "active" (today) or "archived" (past 7 days)
- * Uses Bulgarian timezone for "today" determination
+ * Classify a message as "active" (today or future) or "archived" (past)
+ * Uses Bulgarian timezone for date determination
  *
  * Classification logic:
  * 1. Try to get latest timespan end date from extractedData
- * 2. If found, check if it's today in Bulgarian time → "active", else "archived"
+ * 2. If found, check if it's today or in the future in Bulgarian time → "active", else "archived"
  * 3. Fallback: use createdAt, check if today → "active", else "archived"
  */
 export function classifyMessage(message: Message): MessageClassification {
@@ -156,7 +156,10 @@ export function classifyMessage(message: Message): MessageClassification {
       })
     );
 
-    return isToday(bulgarianTimespanEnd, today) ? "active" : "archived";
+    // Check if the timespan ends today or in the future
+    return isToday(bulgarianTimespanEnd, today) || bulgarianTimespanEnd > today
+      ? "active"
+      : "archived";
   }
 
   // Fallback to createdAt
