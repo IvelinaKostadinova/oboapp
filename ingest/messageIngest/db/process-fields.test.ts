@@ -68,6 +68,28 @@ describe("processFieldsForFirestore", () => {
       expect(result.categories).toEqual([]);
       expect(Array.isArray(result.categories)).toBe(true);
     });
+
+    it("should coerce JSON string categories to array", () => {
+      const input = {
+        categories: '["water", "traffic"]',
+      };
+
+      const result = processFieldsForFirestore(input);
+
+      expect(result.categories).toEqual(["water", "traffic"]);
+      expect(Array.isArray(result.categories)).toBe(true);
+    });
+
+    it("should coerce comma-separated categories to array", () => {
+      const input = {
+        categories: "water, traffic",
+      };
+
+      const result = processFieldsForFirestore(input);
+
+      expect(result.categories).toEqual(["water", "traffic"]);
+      expect(Array.isArray(result.categories)).toBe(true);
+    });
   });
 
   describe("object stringification", () => {

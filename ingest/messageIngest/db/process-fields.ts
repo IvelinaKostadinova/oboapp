@@ -1,4 +1,5 @@
 import { FieldValue } from "firebase-admin/firestore";
+import { normalizeCategoriesInput } from "@/lib/category-utils";
 
 /**
  * Process fields for Firestore storage
@@ -15,8 +16,10 @@ export function processFieldsForFirestore(
   for (const [key, value] of Object.entries(fields)) {
     if (value instanceof Date) {
       processedFields[key] = FieldValue.serverTimestamp();
-    } else if (key === "categories" || key === "relations") {
-      // Keep categories and relations as native arrays for Firestore array indexes
+    } else if (key === "categories") {
+      processedFields[key] = normalizeCategoriesInput(value);
+    } else if (key === "relations") {
+      // Keep relations as native arrays for Firestore array indexes
       processedFields[key] = value;
     } else if (typeof value === "object" && value !== null) {
       // Stringify objects (extractedData, geoJson, categorize)

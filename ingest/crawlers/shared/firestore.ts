@@ -1,4 +1,5 @@
 import type { Firestore } from "firebase-admin/firestore";
+import { normalizeCategoriesInput } from "@/lib/category-utils";
 import type { BaseSourceDocument } from "./types";
 
 /**
@@ -14,7 +15,7 @@ export function encodeDocumentId(url: string): string {
  */
 export async function isUrlProcessed(
   url: string,
-  adminDb: Firestore
+  adminDb: Firestore,
 ): Promise<boolean> {
   const docId = encodeDocumentId(url);
   const docRef = adminDb.collection("sources").doc(docId);
@@ -32,7 +33,7 @@ export async function saveSourceDocument<T extends BaseSourceDocument>(
   options?: {
     transformData?: (doc: T) => Record<string, any>;
     logSuccess?: boolean;
-  }
+  },
 ): Promise<void> {
   const docId = encodeDocumentId(doc.url);
   const docRef = adminDb.collection("sources").doc(docId);
@@ -40,6 +41,10 @@ export async function saveSourceDocument<T extends BaseSourceDocument>(
   const data = options?.transformData
     ? options.transformData(doc)
     : { ...doc, crawledAt: new Date(doc.crawledAt) };
+
+  if ("categories" in data) {
+    data.categories = normalizeCategoriesInput(data.categories);
+  }
 
   await docRef.set(data);
 
@@ -56,7 +61,7 @@ export async function saveSourceDocument<T extends BaseSourceDocument>(
 export async function saveSourceDocumentIfNew<T extends BaseSourceDocument>(
   doc: T,
   adminDb: Firestore,
-  options?: Parameters<typeof saveSourceDocument<T>>[2]
+  options?: Parameters<typeof saveSourceDocument<T>>[2],
 ): Promise<boolean> {
   const exists = await isUrlProcessed(doc.url, adminDb);
   if (exists) {

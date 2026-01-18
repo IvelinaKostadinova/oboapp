@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeCategoriesInput } from "./category-utils";
 
 // Predefined category enum from categorize.md
 export const CategoryEnum = z.enum([
@@ -26,12 +27,12 @@ const CoordinateString = z
   .string()
   .regex(
     /^-?\d+\.\d+,\s*-?\d+\.\d+$/,
-    "Invalid coordinate format. Expected 'latitude, longitude'"
+    "Invalid coordinate format. Expected 'latitude, longitude'",
   );
 
 // Schema for a single categorized message object
 const CategorizedMessageSchema = z.object({
-  categories: z.array(CategoryEnum),
+  categories: z.preprocess(normalizeCategoriesInput, z.array(CategoryEnum)),
   relations: z.array(z.string()).optional(),
   withSpecificAddress: z.boolean(),
   specificAddresses: z.array(z.string()),
