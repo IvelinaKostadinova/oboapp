@@ -1,8 +1,4 @@
-import {
-  Address,
-  OverpassResponse,
-  OverpassGeometry,
-} from "./types";
+import { Address, OverpassResponse, OverpassGeometry } from "./types";
 import * as turf from "@turf/turf";
 import type { Feature, MultiLineString, Position } from "geojson";
 import {
@@ -15,7 +11,50 @@ import { delay } from "./delay";
 
 // Constants for API rate limiting
 const OVERPASS_DELAY_MS = 500; // 500ms for Overpass API (generous limits)
+const OVERPASS_TIMEOUT_MS = 25000; // 25 seconds timeout for HTTP requests
 const BUFFER_DISTANCE_METERS = 30; // Buffer distance for street geometries
+
+/**
+ * Parse Overpass XML error response to extract error message
+ */
+function parseOverpassError(responseText: string): string | null {
+  const remarkMatch = /<remark>\s*([\s\S]+?)\s*<\/remark>/.exec(responseText);
+  if (remarkMatch) {
+    return remarkMatch[1].trim();
+  }
+  return null;
+}
+
+/**
+ * Determine if error is client-side (our query problem) or server-side (should retry)
+ */
+function shouldTryFallback(error: Error, statusCode?: number): boolean {
+  const msg = error.message.toLowerCase();
+
+  // Client-side errors (our fault) - don't retry
+  if (
+    msg.includes("syntax") ||
+    msg.includes("parse error") ||
+    msg.includes("expected") ||
+    msg.includes("unexpected") ||
+    msg.includes("invalid")
+  ) {
+    return false;
+  }
+
+  // HTTP 4xx = client error (except 429 Too Many Requests)
+  if (
+    statusCode &&
+    statusCode >= 400 &&
+    statusCode < 500 &&
+    statusCode !== 429
+  ) {
+    return false;
+  }
+
+  // All other errors = server-side, should retry
+  return true;
+}
 
 // Multiple Overpass API instances for fallback
 const OVERPASS_INSTANCES = [
@@ -45,7 +84,7 @@ function normalizeStreetName(streetName: string): string {
  * Returns actual LineString geometries from OSM, preserving way structure
  */
 async function getStreetGeometryFromOverpass(
-  streetName: string
+  streetName: string,
 ): Promise<Feature<MultiLineString> | null> {
   try {
     // Normalize street name for better OSM matching
@@ -95,6 +134,12 @@ async function getStreetGeometryFromOverpass(
     let lastError: Error | null = null;
 
     for (const instance of OVERPASS_INSTANCES) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(
+        () => controller.abort(),
+        OVERPASS_TIMEOUT_MS,
+      );
+
       try {
         const response = await fetch(instance, {
           method: "POST",
@@ -102,17 +147,67 @@ async function getStreetGeometryFromOverpass(
             "Content-Type": "application/x-www-form-urlencoded",
           },
           body: `data=${encodeURIComponent(query)}`,
+          signal: controller.signal,
         });
 
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          // Try to extract XML error message
+          const text = await response.text();
+          const errorMsg = parseOverpassError(text) || response.statusText;
+          const error = new Error(`HTTP ${response.status}: ${errorMsg}`);
+
+          if (!shouldTryFallback(error, response.status)) {
+            // Client-side error - don't try other servers
+            clearTimeout(timeoutId);
+            console.error(`   ✗ Client error (query issue): ${errorMsg}`);
+            throw error;
+          }
+
+          console.log(
+            `   ✗ Server error from ${new URL(instance).hostname}: ${errorMsg}`,
+          );
+          lastError = error;
+          clearTimeout(timeoutId);
+          continue;
         }
 
-        responseData = await response.json();
+        // Parse JSON defensively - buffer as text first
+        const text = await response.text();
+        try {
+          responseData = JSON.parse(text);
+          console.log(`   ✅ Response from ${new URL(instance).hostname}`);
+        } catch (parseError) {
+          // Failed to parse JSON - might be XML error with HTTP 200
+          const errorMsg = parseOverpassError(text);
+          if (errorMsg) {
+            throw new Error(errorMsg);
+          }
+          // Re-throw the original parse error
+          throw parseError;
+        }
+
+        clearTimeout(timeoutId);
         break; // Success, exit loop
       } catch (error) {
-        console.log(`   ✗ Failed with ${new URL(instance).hostname}: ${error}`);
-        lastError = error as Error;
+        clearTimeout(timeoutId);
+
+        const err = error as Error;
+
+        // Check if this is a client-side error
+        if (!shouldTryFallback(err)) {
+          console.error(`   ✗ Client error (query issue): ${err.message}`);
+          throw err;
+        }
+
+        // Server-side error or timeout - try next instance
+        if (err.name === "AbortError") {
+          console.log(`   ✗ Timeout with ${new URL(instance).hostname}`);
+        } else {
+          console.log(
+            `   ✗ Failed with ${new URL(instance).hostname}: ${err.message}`,
+          );
+        }
+        lastError = err;
         continue; // Try next instance
       }
     }
@@ -157,7 +252,7 @@ async function getStreetGeometryFromOverpass(
           (point: OverpassGeometry) => [
             Math.round(point.lon * 1000000) / 1000000,
             Math.round(point.lat * 1000000) / 1000000,
-          ]
+          ],
         );
         lineStrings.push(coordinates);
         totalPoints += coordinates.length;
@@ -166,13 +261,13 @@ async function getStreetGeometryFromOverpass(
 
     if (lineStrings.length === 0) {
       console.log(
-        `   ℹ️  No valid geometries in response for: "${streetName}"`
+        `   ℹ️  No valid geometries in response for: "${streetName}"`,
       );
       return null;
     }
 
     console.log(
-      `✅ Found ${lineStrings.length} way segments with ${totalPoints} total points for: ${streetName}`
+      `✅ Found ${lineStrings.length} way segments with ${totalPoints} total points for: ${streetName}`,
     );
 
     const multiLineString: Feature<MultiLineString> = {
@@ -196,7 +291,7 @@ async function getStreetGeometryFromOverpass(
  */
 function findGeometricIntersection(
   street1: Feature<MultiLineString>,
-  street2: Feature<MultiLineString>
+  street2: Feature<MultiLineString>,
 ): { lat: number; lng: number } | null {
   try {
     // First, try exact intersection using turf.lineIntersect
@@ -204,15 +299,15 @@ function findGeometricIntersection(
 
     if (intersections.features.length > 0) {
       console.log(
-        `   Found ${intersections.features.length} exact intersection(s)`
+        `   Found ${intersections.features.length} exact intersection(s)`,
       );
 
       if (intersections.features.length === 1) {
         const point = intersections.features[0].geometry.coordinates;
         console.log(
           `   ✅ Intersection at: [${point[1].toFixed(6)}, ${point[0].toFixed(
-            6
-          )}]`
+            6,
+          )}]`,
         );
         return { lng: point[0], lat: point[1] };
       }
@@ -232,7 +327,7 @@ function findGeometricIntersection(
             lng: coords[0],
             distance: distance,
           };
-        }
+        },
       );
 
       // Sort by distance from Sofia center
@@ -241,8 +336,8 @@ function findGeometricIntersection(
       const best = intersectionsWithDistance[0];
       console.log(
         `   ✅ Using closest to Sofia center: [${best.lat.toFixed(
-          6
-        )}, ${best.lng.toFixed(6)}] (${best.distance.toFixed(0)}m away)`
+          6,
+        )}, ${best.lng.toFixed(6)}] (${best.distance.toFixed(0)}m away)`,
       );
 
       return { lng: best.lng, lat: best.lat };
@@ -266,7 +361,7 @@ function findGeometricIntersection(
 
     // Try intersection on buffered geometries
     const bufferedIntersection = turf.intersect(
-      turf.featureCollection([buffered1, buffered2])
+      turf.featureCollection([buffered1, buffered2]),
     );
 
     if (bufferedIntersection) {
@@ -304,16 +399,16 @@ function findGeometricIntersection(
       // 200m threshold
       console.log(
         `✅ Found nearest point at: [${bestPoint.lat.toFixed(
-          6
-        )}, ${bestPoint.lng.toFixed(6)}] (${minDistance.toFixed(1)}m gap)`
+          6,
+        )}, ${bestPoint.lng.toFixed(6)}] (${minDistance.toFixed(1)}m gap)`,
       );
       return bestPoint;
     }
 
     console.warn(
       `   Streets too far apart (${minDistance.toFixed(
-        1
-      )}m), no valid intersection`
+        1,
+      )}m), no valid intersection`,
     );
     return null;
   } catch (error) {
@@ -326,7 +421,7 @@ function findGeometricIntersection(
  * Main geocoding function using Overpass API and Turf.js
  */
 export async function overpassGeocodeIntersections(
-  intersections: string[]
+  intersections: string[],
 ): Promise<Address[]> {
   const results: Address[] = [];
 
@@ -390,11 +485,11 @@ export async function overpassGeocodeIntersections(
 export async function getStreetSectionGeometry(
   streetName: string,
   startCoords: { lat: number; lng: number },
-  endCoords: { lat: number; lng: number }
+  endCoords: { lat: number; lng: number },
 ): Promise<Position[] | null> {
   try {
     console.log(
-      `🔍 Finding street section: ${streetName} from [${startCoords.lat}, ${startCoords.lng}] to [${endCoords.lat}, ${endCoords.lng}]`
+      `🔍 Finding street section: ${streetName} from [${startCoords.lat}, ${startCoords.lng}] to [${endCoords.lat}, ${endCoords.lng}]`,
     );
 
     // Get full street geometry
@@ -459,14 +554,14 @@ export async function getStreetSectionGeometry(
 
     if (bestSection && bestSection.length >= 2) {
       console.log(
-        `   ✅ Found street section with ${bestSection.length} points`
+        `   ✅ Found street section with ${bestSection.length} points`,
       );
       return bestSection;
     }
 
     // Fallback: try to connect multiple segments
     console.log(
-      `   ⚠️  No single segment found, trying to connect segments...`
+      `   ⚠️  No single segment found, trying to connect segments...`,
     );
 
     // Build a path by connecting segments
@@ -479,7 +574,7 @@ export async function getStreetSectionGeometry(
       turf.distance(
         turf.point(connectedPath[connectedPath.length - 1]),
         endPoint,
-        { units: "meters" }
+        { units: "meters" },
       ) > 10
     ) {
       // Find nearest unused segment to current point
@@ -506,7 +601,7 @@ export async function getStreetSectionGeometry(
 
       if (nearestSegmentIdx === -1 || nearestDist > 50) {
         console.log(
-          `   ❌ Cannot connect segments (min dist: ${nearestDist}m)`
+          `   ❌ Cannot connect segments (min dist: ${nearestDist}m)`,
         );
         break;
       }
@@ -550,7 +645,7 @@ export async function getStreetSectionGeometry(
 
     if (connectedPath.length >= 2) {
       console.log(
-        `   ✅ Connected ${usedSegments.size} segments into path with ${connectedPath.length} points`
+        `   ✅ Connected ${usedSegments.size} segments into path with ${connectedPath.length} points`,
       );
       return connectedPath;
     }
@@ -567,7 +662,7 @@ export async function getStreetSectionGeometry(
  * Geocode a specific address with house number using Nominatim
  */
 async function geocodeAddressWithNominatim(
-  address: string
+  address: string,
 ): Promise<{ lat: number; lng: number } | null> {
   try {
     // Ensure address includes Sofia context
@@ -578,7 +673,7 @@ async function geocodeAddressWithNominatim(
 
     // Add bounded search to Sofia area and increase limit to filter results
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
-      fullAddress
+      fullAddress,
     )}&format=json&limit=5&addressdetails=1&bounded=1&viewbox=${
       SOFIA_BOUNDS.west
     },${SOFIA_BOUNDS.south},${SOFIA_BOUNDS.east},${SOFIA_BOUNDS.north}`;
@@ -607,18 +702,18 @@ async function geocodeAddressWithNominatim(
         // Validate coordinates are within Sofia
         if (isWithinSofia(coords.lat, coords.lng)) {
           console.log(
-            `   ✅ Nominatim geocoded: "${address}" → [${coords.lat}, ${coords.lng}]`
+            `   ✅ Nominatim geocoded: "${address}" → [${coords.lat}, ${coords.lng}]`,
           );
           return coords;
         } else {
           console.warn(
-            `   ⚠️  Nominatim result for "${address}" outside Sofia: [${coords.lat}, ${coords.lng}]`
+            `   ⚠️  Nominatim result for "${address}" outside Sofia: [${coords.lat}, ${coords.lng}]`,
           );
         }
       }
 
       console.warn(
-        `   ❌ All Nominatim results for "${address}" are outside Sofia`
+        `   ❌ All Nominatim results for "${address}" are outside Sofia`,
       );
       return null;
     }
@@ -635,7 +730,7 @@ async function geocodeAddressWithNominatim(
  * Geocode individual addresses using Overpass API
  */
 export async function overpassGeocodeAddresses(
-  addresses: string[]
+  addresses: string[],
 ): Promise<Address[]> {
   const results: Address[] = [];
 
