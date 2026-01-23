@@ -1,13 +1,20 @@
 import type { Metadata } from "next";
 import Script from "next/script";
+import { Sofia_Sans } from "next/font/google";
 import "./globals.css";
 import ClientLayout from "@/components/ClientLayout";
+
+const sofiaSans = Sofia_Sans({
+  subsets: ["latin", "cyrillic"],
+  variable: "--font-sofia-sans",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "OboApp",
   description: "Следи събитията в район Оборище",
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_BASE_URL || "https://oboapp.online"
+    process.env.NEXT_PUBLIC_BASE_URL || "https://oboapp.online",
   ),
   manifest: "/manifest.json",
   appleWebApp: {
@@ -40,7 +47,7 @@ export default function RootLayout({
 
   return (
     <html lang="bg">
-      <body>
+      <body className={`${sofiaSans.variable} font-sofia`}>
         {gaId && (
           <>
             <Script

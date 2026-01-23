@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { trackEvent } from "@/lib/analytics";
 
 export default function Footer() {
@@ -9,7 +10,9 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* About Section */}
           <div>
-            <h3 className="font-bold text-lg mb-4 text-foreground">За проекта</h3>
+            <h3 className="font-bold text-lg mb-4 text-foreground">
+              За проекта
+            </h3>
             <div className="space-y-2 text-sm">
               <div>
                 <a
@@ -20,9 +23,12 @@ export default function Footer() {
                 </a>
               </div>
               <div>
-                <a href="/sources" className="text-link hover:text-link-hover hover:underline">
+                <Link
+                  href="/sources"
+                  className="text-link hover:text-link-hover hover:underline"
+                >
                   Източници на данни
-                </a>
+                </Link>
               </div>
             </div>
           </div>
