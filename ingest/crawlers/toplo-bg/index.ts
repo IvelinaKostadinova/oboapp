@@ -6,6 +6,7 @@ import { buildMessage, buildUrl, buildTitle } from "./builders";
 import { launchBrowser } from "../shared/browser";
 import { saveSourceDocumentIfNew } from "../shared/firestore";
 import type { SourceDocumentWithGeoJson } from "../shared/types";
+import { validateTimespanRange } from "@/lib/timespan-utils";
 
 dotenv.config({ path: resolve(process.cwd(), ".env.local") });
 
@@ -62,8 +63,51 @@ export async function crawl(dryRun = false): Promise<void> {
         info.Name,
         info.FromDate,
         info.Addresses,
-        info.UntilDate
+        info.UntilDate,
       );
+
+      // Extract timespans from incident info
+      let timespanStart: Date;
+      let timespanEnd: Date;
+
+      try {
+        const parsed = new Date(info.FromDate);
+        if (validateTimespanRange(parsed)) {
+          timespanStart = parsed;
+        } else {
+          console.warn(
+            `   ⚠️  FromDate outside valid range for ${info.ContentItemId}: ${info.FromDate}`,
+          );
+          timespanStart = new Date();
+        }
+      } catch (error) {
+        console.warn(
+          `   ⚠️  Invalid FromDate for ${info.ContentItemId}: ${info.FromDate} - ${error}`,
+        );
+        timespanStart = new Date();
+      }
+
+      try {
+        // UntilDate can be null
+        if (info.UntilDate) {
+          const parsed = new Date(info.UntilDate);
+          if (validateTimespanRange(parsed)) {
+            timespanEnd = parsed;
+          } else {
+            console.warn(
+              `   ⚠️  UntilDate outside valid range for ${info.ContentItemId}: ${info.UntilDate}`,
+            );
+            timespanEnd = timespanStart;
+          }
+        } else {
+          timespanEnd = timespanStart; // Use start date for both
+        }
+      } catch (error) {
+        console.warn(
+          `   ⚠️  Invalid UntilDate for ${info.ContentItemId}: ${info.UntilDate} - ${error}`,
+        );
+        timespanEnd = timespanStart;
+      }
 
       const doc: SourceDocument = {
         url: buildUrl(info.ContentItemId),
@@ -76,6 +120,8 @@ export async function crawl(dryRun = false): Promise<void> {
         geoJson,
         categories: ["heating"],
         isRelevant: true,
+        timespanStart,
+        timespanEnd,
       };
 
       if (dryRun) {
@@ -105,7 +151,7 @@ export async function crawl(dryRun = false): Promise<void> {
 
   // Print summary
   console.log(
-    `\n📈 Saved: ${summary.saved}; Skipped: ${summary.skipped}; Failed: ${summary.failed}`
+    `\n📈 Saved: ${summary.saved}; Skipped: ${summary.skipped}; Failed: ${summary.failed}`,
   );
 
   // Exit with error if all failed

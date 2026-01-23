@@ -4,7 +4,7 @@ import {
   GeoJSONFeatureCollection,
   Message,
 } from "@/lib/types";
-import { storeIncomingMessage, updateMessage } from "./db";
+import { storeIncomingMessage, updateMessage, getMessageById } from "./db";
 import { encodeDocumentId } from "../crawlers/shared/firestore";
 import { generateMessageId, formatCategorizedMessageLogInfo } from "./utils";
 
@@ -41,6 +41,14 @@ export interface MessageIngestOptions {
    * Optional markdown-formatted text for display (when crawler produces markdown)
    */
   markdownText?: string;
+  /**
+   * Optional timespan start from source (for precomputed GeoJSON crawlers)
+   */
+  timespanStart?: Date;
+  /**
+   * Optional timespan end from source (for precomputed GeoJSON crawlers)
+   */
+  timespanEnd?: Date;
   /**
    * Categories for sources with precomputed GeoJSON (for Firestore indexing)
    */
@@ -118,11 +126,23 @@ async function processSingleMessage(
   let addresses: Address[] = [];
   let geoJson: GeoJSONFeatureCollection | null = precomputedGeoJson;
 
-  if (!precomputedGeoJson) {
+  // Calculate crawledAt once for use in both branches
+  const crawledAt = ensureCrawledAtDate(options.crawledAt);
+
+  if (precomputedGeoJson) {
+    extractedData = await handlePrecomputedGeoJsonData(
+      messageId,
+      options.markdownText,
+      options.timespanStart,
+      options.timespanEnd,
+      crawledAt,
+    );
+  } else {
     const extractionResult = await extractAndGeocodeFromText(
       messageId,
       text,
       categorizedMessage,
+      crawledAt,
     );
 
     if (!extractionResult) {
@@ -132,11 +152,6 @@ async function processSingleMessage(
     extractedData = extractionResult.extractedData;
     addresses = extractionResult.addresses;
     geoJson = extractionResult.geoJson;
-  } else {
-    extractedData = await handlePrecomputedGeoJsonData(
-      messageId,
-      options.markdownText,
-    );
   }
 
   geoJson = await applyBoundaryFilteringIfNeeded(
@@ -353,7 +368,8 @@ async function handleIrrelevantMessage(
 async function extractAndGeocodeFromText(
   messageId: string,
   text: string,
-  categorizedMessage?: any,
+  categorizedMessage: any | undefined,
+  crawledAt: Date,
 ): Promise<{
   extractedData: ExtractedData;
   addresses: Address[];
@@ -362,7 +378,7 @@ async function extractAndGeocodeFromText(
   const { extractAddressesFromMessage } = await import("./extract-addresses");
   const extractedData = await extractAddressesFromMessage(text);
 
-  await storeExtractedData(messageId, extractedData);
+  await storeExtractedData(messageId, extractedData, crawledAt);
 
   if (!extractedData) {
     return null;
@@ -395,16 +411,50 @@ async function extractAndGeocodeFromText(
 }
 
 /**
+ * Convert crawledAt to Date object, handling string/Date/undefined cases
+ * Falls back to current date for invalid/missing values
+ */
+function ensureCrawledAtDate(crawledAt: Date | string | undefined): Date {
+  if (crawledAt instanceof Date) {
+    return crawledAt;
+  }
+  if (crawledAt) {
+    const date = new Date(crawledAt);
+    // Check if date is valid (Invalid Date has NaN getTime())
+    if (!Number.isNaN(date.getTime())) {
+      return date;
+    }
+  }
+  return new Date();
+}
+
+/**
  * Store extracted data and markdown text in the message
  */
 async function storeExtractedData(
   messageId: string,
   extractedData: ExtractedData | null,
+  crawledAt: Date,
 ): Promise<void> {
+  const { extractTimespanRangeFromExtractedData, validateAndFallback } =
+    await import("@/lib/timespan-utils");
+
   const markdownText = extractedData?.markdown_text || "";
+
+  // Extract timespans from extractedData (pins/streets)
+  const { timespanStart, timespanEnd } = extractTimespanRangeFromExtractedData(
+    extractedData,
+    crawledAt,
+  );
+
+  // Validate and fallback to crawledAt if invalid
+  const validated = validateAndFallback(timespanStart, timespanEnd, crawledAt);
+
   await updateMessage(messageId, {
     extractedData,
     markdownText,
+    timespanStart: validated.timespanStart,
+    timespanEnd: validated.timespanEnd,
   });
 }
 
@@ -488,7 +538,12 @@ async function finalizeFailedMessage(
 async function handlePrecomputedGeoJsonData(
   messageId: string,
   markdownText: string | undefined,
+  timespanStart: Date | undefined,
+  timespanEnd: Date | undefined,
+  crawledAt: Date,
 ): Promise<ExtractedData | null> {
+  const { validateAndFallback } = await import("@/lib/timespan-utils");
+
   if (markdownText) {
     const extractedData: ExtractedData = {
       responsible_entity: "",
@@ -497,9 +552,18 @@ async function handlePrecomputedGeoJsonData(
       markdown_text: markdownText,
     };
 
+    // Validate timespans from source
+    const validated = validateAndFallback(
+      timespanStart,
+      timespanEnd,
+      crawledAt,
+    );
+
     await updateMessage(messageId, {
       markdownText,
       extractedData,
+      timespanStart: validated.timespanStart,
+      timespanEnd: validated.timespanEnd,
     });
 
     return extractedData;

@@ -6,10 +6,12 @@ export interface BaseSourceDocument {
   sourceType: string;
   crawledAt: Date;
   markdownText?: string; // Optional markdown-formatted message for display
+  timespanStart?: Date; // Optional - for precomputed sources with temporal data
+  timespanEnd?: Date; // Optional - for precomputed sources with temporal data
 }
 
 export interface SourceDocumentWithGeoJson extends BaseSourceDocument {
-  geoJson: import("../../lib/types").GeoJSONFeatureCollection;
+  geoJson: import("../../lib/types").GeoJSONFeatureCollection | string;
   markdownText: string; // Required for crawlers with precomputed GeoJSON
   categories: string[];
   isRelevant: boolean;

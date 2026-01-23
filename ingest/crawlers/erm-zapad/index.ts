@@ -6,6 +6,7 @@ import { validateAndFixGeoJSON } from "../shared/geojson-validation";
 import { launchBrowser } from "../shared/browser";
 import { saveSourceDocumentIfNew } from "../shared/firestore";
 import { parseBulgarianDateTime } from "../shared/date-utils";
+import { validateTimespanRange } from "@/lib/timespan-utils";
 import { buildGeoJSON, buildMessage, buildTitle } from "./builders";
 import type {
   ApiResponse,
@@ -40,7 +41,7 @@ async function discoverMunicipalities(): Promise<Municipality[]> {
       // Find the Sofia-City region card
       const headers = Array.from(document.querySelectorAll("h5.card-title"));
       const sofiaHeader = headers.find((h) =>
-        h.textContent?.includes("Област София-град")
+        h.textContent?.includes("Област София-град"),
       );
 
       if (!sofiaHeader) {
@@ -93,7 +94,7 @@ async function discoverMunicipalities(): Promise<Municipality[]> {
  * Fetch incidents for a specific municipality
  */
 async function fetchMunicipalityIncidents(
-  code: string
+  code: string,
 ): Promise<RawIncident[]> {
   const formData = new URLSearchParams({
     action: "draw",
@@ -113,7 +114,7 @@ async function fetchMunicipalityIncidents(
 
   if (!response.ok) {
     throw new Error(
-      `Failed to fetch incidents for ${code}: ${response.status} ${response.statusText}`
+      `Failed to fetch incidents for ${code}: ${response.status} ${response.statusText}`,
     );
   }
 
@@ -134,7 +135,7 @@ async function fetchMunicipalityIncidents(
  * Convert raw incident to source document
  */
 function buildSourceDocument(
-  incident: RawIncident
+  incident: RawIncident,
 ): ErmZapadSourceDocument | null {
   // Validate required fields
   if (!incident.ceo || typeof incident.ceo !== "string") {
@@ -172,13 +173,56 @@ function buildSourceDocument(
   if (incident.begin_event) {
     try {
       datePublished = parseBulgarianDateTime(
-        incident.begin_event
+        incident.begin_event,
       ).toISOString();
-    } catch (error) {
+    } catch {
       console.warn(
-        `   ⚠️  Invalid date format for ${incident.ceo}: ${incident.begin_event}`
+        `   ⚠️  Invalid date format for ${incident.ceo}: ${incident.begin_event}`,
       );
     }
+  }
+
+  // Extract timespans from incident
+  let timespanStart = new Date(); // Default to crawledAt
+  let timespanEnd = new Date();
+
+  try {
+    if (incident.begin_event) {
+      const parsed = parseBulgarianDateTime(incident.begin_event);
+      if (validateTimespanRange(parsed)) {
+        timespanStart = parsed;
+      } else {
+        console.warn(
+          `   ⚠️  begin_event outside valid range for ${incident.ceo}: ${incident.begin_event}`,
+        );
+      }
+    }
+  } catch (error) {
+    console.warn(
+      `   ⚠️  Invalid begin_event for ${incident.ceo}: ${incident.begin_event} - ${error}`,
+    );
+  }
+
+  try {
+    if (incident.end_event) {
+      const parsed = parseBulgarianDateTime(incident.end_event);
+      if (validateTimespanRange(parsed)) {
+        timespanEnd = parsed;
+      } else {
+        console.warn(
+          `   ⚠️  end_event outside valid range for ${incident.ceo}: ${incident.end_event}`,
+        );
+        timespanEnd = timespanStart;
+      }
+    } else if (incident.begin_event) {
+      // Use start for both if only start available
+      timespanEnd = timespanStart;
+    }
+  } catch (error) {
+    console.warn(
+      `   ⚠️  Invalid end_event for ${incident.ceo}: ${incident.end_event} - ${error}`,
+    );
+    timespanEnd = timespanStart;
   }
 
   return {
@@ -189,9 +233,11 @@ function buildSourceDocument(
     markdownText: message,
     sourceType: SOURCE_TYPE,
     crawledAt: new Date(),
-    geoJson: validation.geoJson,
+    geoJson: JSON.stringify(validation.geoJson),
     categories: ["electricity"],
     isRelevant: true,
+    timespanStart,
+    timespanEnd,
   };
 }
 
@@ -199,7 +245,7 @@ function buildSourceDocument(
  * Process incidents for a municipality
  */
 async function processMunicipality(
-  municipality: Municipality
+  municipality: Municipality,
 ): Promise<CrawlSummary> {
   console.log(`\n📍 Processing ${municipality.name} (${municipality.code})...`);
 
@@ -234,7 +280,7 @@ async function processMunicipality(
       } catch (error) {
         console.error(
           `   ❌ Failed to process incident ${incident.ceo}:`,
-          error
+          error,
         );
         summary.failed++;
       }
@@ -242,7 +288,7 @@ async function processMunicipality(
   } catch (error) {
     console.error(
       `   ❌ Failed to fetch incidents for ${municipality.code}:`,
-      error
+      error,
     );
     throw error; // Re-throw to fail the crawl
   }
@@ -285,7 +331,7 @@ async function crawl(): Promise<void> {
     // Final summary
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(
-      `\n✅ Crawl complete in ${duration}s. Saved: ${totalSummary.saved}; Skipped: ${totalSummary.skipped}; Failed: ${totalSummary.failed}`
+      `\n✅ Crawl complete in ${duration}s. Saved: ${totalSummary.saved}; Skipped: ${totalSummary.skipped}; Failed: ${totalSummary.failed}`,
     );
 
     // Exit with error if all failed
@@ -305,10 +351,7 @@ async function crawl(): Promise<void> {
 
 // Run if called directly
 if (require.main === module) {
-  crawl().catch((error) => {
-    console.error("Fatal error:", error);
-    process.exit(1);
-  });
+  void crawl();
 }
 
 export { crawl };

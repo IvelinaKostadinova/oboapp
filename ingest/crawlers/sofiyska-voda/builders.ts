@@ -28,7 +28,7 @@ export function getFeatureUrl(layerId: number, objectId: number): string {
  */
 export function buildTitle(
   attributes: ArcGisFeature["attributes"],
-  layer: LayerConfig
+  layer: LayerConfig,
 ): string {
   const parts = [
     layer.titlePrefix,
@@ -51,10 +51,10 @@ export function buildTitle(
  */
 export function buildFeatureProperties(
   attributes: ArcGisFeature["attributes"],
-  layer: LayerConfig
+  layer: LayerConfig,
 ): Record<string, FeatureProperty> {
   const sanitized = (
-    value?: NullableFeatureProperty
+    value?: NullableFeatureProperty,
   ): NullableFeatureProperty => {
     if (typeof value === "string") {
       return sanitizeText(value);
@@ -84,7 +84,7 @@ export function buildFeatureProperties(
  * Create a FeatureCollection from a single feature
  */
 export function createFeatureCollection(
-  feature: GeoJSONFeature
+  feature: GeoJSONFeature,
 ): GeoJSONFeatureCollection {
   return {
     type: "FeatureCollection",
@@ -97,7 +97,7 @@ export function createFeatureCollection(
  */
 export function buildGeoJsonFeatureCollection(
   feature: ArcGisFeature,
-  layer: LayerConfig
+  layer: LayerConfig,
 ): GeoJSONFeatureCollection | null {
   const geometry = feature.geometry;
   if (!geometry) {
@@ -148,11 +148,11 @@ export function buildGeoJsonFeatureCollection(
 /**
  * Build complete SourceDocument from ArcGIS feature
  */
-export function buildSourceDocument(
+export async function buildSourceDocument(
   feature: ArcGisFeature,
   layer: LayerConfig,
-  dateFormatter?: Intl.DateTimeFormat
-): SofiyskaVodaSourceDocument | null {
+  dateFormatter?: Intl.DateTimeFormat,
+): Promise<SofiyskaVodaSourceDocument | null> {
   const objectId = feature.attributes?.OBJECTID;
   if (typeof objectId !== "number") {
     console.warn(`⚠️ Skipping feature without OBJECTID in layer ${layer.id}`);
@@ -163,7 +163,7 @@ export function buildSourceDocument(
   const message = buildMessage(
     feature.attributes as Record<string, unknown>,
     layer,
-    dateFormatter
+    dateFormatter,
   );
   const geoJson = buildGeoJsonFeatureCollection(feature, layer);
   if (!geoJson) {
@@ -174,6 +174,42 @@ export function buildSourceDocument(
     ensureDate(feature.attributes?.LASTUPDATE) ??
     ensureDate(feature.attributes?.START_) ??
     new Date();
+
+  // Extract timespans from ArcGIS attributes
+  let timespanStart: Date | undefined =
+    ensureDate(feature.attributes?.START_) ?? undefined;
+  let timespanEnd: Date | undefined =
+    ensureDate(feature.attributes?.ALERTEND) ?? undefined;
+
+  // Validate extracted dates (import at top of file)
+  const { validateTimespanRange } = await import("@/lib/timespan-utils");
+  const isStartValid = timespanStart
+    ? validateTimespanRange(timespanStart)
+    : false;
+  const isEndValid = timespanEnd ? validateTimespanRange(timespanEnd) : false;
+
+  // Use single date for both if only one available and valid
+  if (isStartValid && !isEndValid) {
+    timespanEnd = timespanStart;
+  } else if (!isStartValid && isEndValid) {
+    timespanStart = timespanEnd;
+  }
+
+  // Fallback to lastUpdate if invalid or missing
+  if (!isStartValid || !isEndValid) {
+    if (!isStartValid && feature.attributes?.START_) {
+      console.warn(
+        `   ⚠️  START_ outside valid range for ${feature.attributes.OBJECTID}: ${feature.attributes.START_}`,
+      );
+    }
+    if (!isEndValid && feature.attributes?.ALERTEND) {
+      console.warn(
+        `   ⚠️  ALERTEND outside valid range for ${feature.attributes.OBJECTID}: ${feature.attributes.ALERTEND}`,
+      );
+    }
+    timespanStart = lastUpdate;
+    timespanEnd = lastUpdate;
+  }
 
   return {
     url,
@@ -186,5 +222,7 @@ export function buildSourceDocument(
     geoJson,
     categories: ["water"],
     isRelevant: true,
+    timespanStart,
+    timespanEnd,
   };
 }
