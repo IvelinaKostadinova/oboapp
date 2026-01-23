@@ -12,9 +12,7 @@ export async function generateMetadata({
   params: Promise<{ sourceId: string }>;
 }): Promise<Metadata> {
   const { sourceId } = await params;
-  const source = (sourcesData as SourceConfig[]).find(
-    (s) => s.id === sourceId,
-  );
+  const source = (sourcesData as SourceConfig[]).find((s) => s.id === sourceId);
 
   if (!source) {
     return {
@@ -27,17 +25,17 @@ export async function generateMetadata({
 
   return {
     title: `${source.name} - OboApp`,
-    description: `Последни съобщения от ${source.name} за събития и ремонти в София`,
+    description: `Последни съобщения от ${source.name}`,
     openGraph: {
       title: `${source.name} - OboApp`,
-      description: `Последни съобщения от ${source.name} за събития и ремонти в София`,
+      description: `Последни съобщения от ${source.name}`,
       url: `${baseUrl}/sources/${source.id}`,
       siteName: "OboApp",
       images: [
         {
           url: logoUrl,
-          width: 128,
-          height: 128,
+          width: 200,
+          height: 200,
           alt: source.name,
         },
       ],
@@ -47,7 +45,7 @@ export async function generateMetadata({
     twitter: {
       card: "summary",
       title: `${source.name} - OboApp`,
-      description: `Последни съобщения от ${source.name} за събития и ремонти в София`,
+      description: `Последни съобщения от ${source.name}`,
       images: [logoUrl],
     },
   };
