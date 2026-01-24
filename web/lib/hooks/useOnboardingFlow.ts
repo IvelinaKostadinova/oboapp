@@ -200,8 +200,16 @@ function handleReEvaluate(
   state: ReducerState,
   context: OnboardingContext,
 ): ReducerState {
-  // Don't re-evaluate if user dismissed (in idle)
+  // Allow progression out of idle when context meaningfully changes
   if (state.state === "idle") {
+    const newState = computeStateFromContext(context);
+
+    // If login or other inputs advance the flow, move forward
+    if (newState !== "idle") {
+      return { state: newState, lastPermission: context.permission };
+    }
+
+    // Otherwise remain idle but keep permission cache fresh
     return { ...state, lastPermission: context.permission };
   }
 

@@ -14,6 +14,14 @@ This hook centralizes the onboarding UX logic for all users, guiding them throug
 This keeps the UI clean and unobtrusive. The onboarding flow starts when the user
 clicks the button, which dispatches `RESTART` and shows the `NotificationPrompt`.
 
+**Header Login:** Logging in from the header re-evaluates the flow immediately.
+If the user was idle and then logs in, the state advances (e.g., to zone creation)
+without requiring a page refresh.
+
+**Logout behavior:** Signing out no longer triggers the browser notification
+permission prompt. When permission is not granted, logout skips FCM token cleanup
+to avoid requesting permission during sign-out.
+
 **Authenticated Users:** Land in the appropriate state based on their progress
 (`zoneCreation`, `notificationPrompt`, `blocked`, or `complete`).
 
@@ -79,6 +87,6 @@ stateDiagram-v2
 | `PERMISSION_RESULT` | Browser permission result                  | `notificationPrompt`                                |
 | `DISMISS`           | User dismissed current prompt              | `notificationPrompt`, `loginPrompt`, `zoneCreation` |
 | `RESTART`           | Re-enter flow from idle                    | `idle`                                              |
-| `RE_EVALUATE`       | External state changed (user, zones, etc.) | All except `idle`                                   |
+| `RE_EVALUATE`       | External state changed (user, zones, etc.) | All                                                 |
 
 > **Note:** The `blocked` state has no user actions. Users can only exit via `RE_EVALUATE` when they enable notifications in browser settings.

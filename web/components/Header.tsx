@@ -1,15 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/lib/auth-context";
+import { trackEvent } from "@/lib/analytics";
+import { buttonStyles, buttonSizes } from "@/lib/theme";
+import { borderRadius } from "@/lib/colors";
 import UserMenu from "@/components/UserMenu";
 
 export default function Header() {
-  const { user } = useAuth();
+  const { user, signInWithGoogle } = useAuth();
   const [logoError, setLogoError] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+
+  const handleLoginClick = useCallback(async () => {
+    trackEvent({ name: "login_initiated", params: { source: "header" } });
+    try {
+      await signInWithGoogle();
+    } catch (error) {
+      console.error("Error signing in from header:", error);
+      alert("Неуспешен вход. Моля, опитайте отново.");
+    }
+  }, [signInWithGoogle]);
 
   return (
     <>
@@ -46,7 +59,7 @@ export default function Header() {
 
             {/* Right side - User Info */}
             <div>
-              {user && (
+              {user ? (
                 <button
                   type="button"
                   onClick={() => setShowUserMenu(true)}
@@ -62,6 +75,15 @@ export default function Header() {
                       className="w-8 h-8 rounded-full"
                     />
                   )}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleLoginClick}
+                  className={`${buttonStyles.primary} ${buttonSizes.md} ${borderRadius.sm}`}
+                  aria-label="Влез"
+                >
+                  Влез
                 </button>
               )}
             </div>

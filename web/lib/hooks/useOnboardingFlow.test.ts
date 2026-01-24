@@ -387,7 +387,7 @@ describe("onboardingReducer", () => {
       expect(result.state).toBe("complete");
     });
 
-    it("does not re-evaluate from idle state", () => {
+    it("progresses from idle when context moves forward", () => {
       const initialState = createInitialState("idle", "granted");
       const context: OnboardingContext = {
         permission: "granted",
@@ -402,7 +402,7 @@ describe("onboardingReducer", () => {
 
       const result = onboardingReducer(initialState, action);
 
-      expect(result.state).toBe("idle");
+      expect(result.state).toBe("complete");
       expect(result.lastPermission).toBe("granted");
     });
 

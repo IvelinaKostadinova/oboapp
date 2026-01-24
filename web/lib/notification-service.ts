@@ -292,6 +292,15 @@ export async function unsubscribeOnSignOut(
     return;
   }
 
+  // If permission isn't granted, skip token cleanup to avoid prompting
+  const permission = getNotificationPermission();
+  if (permission !== "granted") {
+    console.warn(
+      "Skipping notification unsubscribe on sign out: permission not granted",
+    );
+    return;
+  }
+
   try {
     // Get the current FCM token
     const token = await getToken(messaging, { vapidKey });
