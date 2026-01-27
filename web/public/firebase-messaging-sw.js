@@ -3,7 +3,7 @@
 
 importScripts(
   "https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js",
-  "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js"
+  "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js",
 );
 
 // Initialize Firebase in the service worker
@@ -22,15 +22,14 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
   console.log(
     "[firebase-messaging-sw.js] Received background message:",
-    payload
+    payload,
   );
 
-  const notificationTitle =
-    payload.notification?.title || "Ново съобщение в OboApp";
+  const notificationTitle = payload.data?.title || "Ново съобщение в OboApp";
   const notificationOptions = {
-    body: payload.notification?.body || "",
-    icon: payload.notification?.icon || "/icon-192x192.png",
-    badge: "/icon-72x72.png",
+    body: payload.data?.body || "",
+    icon: payload.data?.icon || "/icon-192x192.png",
+    badge: payload.data?.badge || "/icon-72x72.png",
     tag: payload.data?.messageId || "default",
     data: {
       url: payload.data?.url || payload.fcmOptions?.link || "/",
@@ -44,7 +43,7 @@ messaging.onBackgroundMessage((payload) => {
 
   return globalThis.registration.showNotification(
     notificationTitle,
-    notificationOptions
+    notificationOptions,
   );
 });
 
@@ -83,6 +82,6 @@ self.addEventListener("notificationclick", (event) => {
         if (clients.openWindow) {
           return clients.openWindow(urlToOpen);
         }
-      })
+      }),
   );
 });

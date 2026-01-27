@@ -19,7 +19,7 @@ dotenv.config({ path: resolve(process.cwd(), ".env.local") });
 // App URL (required)
 if (!process.env.NEXT_PUBLIC_APP_URL) {
   throw new Error(
-    "Environment variable NEXT_PUBLIC_APP_URL must be set (e.g. https://oboapp.online)"
+    "Environment variable NEXT_PUBLIC_APP_URL must be set (e.g. https://oboapp.online)",
   );
 }
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL;
@@ -80,7 +80,7 @@ async function getUnprocessedMessages(adminDb: Firestore): Promise<Message[]> {
  */
 async function markMessagesAsNotified(
   adminDb: Firestore,
-  messageIds: string[]
+  messageIds: string[],
 ): Promise<void> {
   console.log(`\n📝 Marking ${messageIds.length} messages as notified...`);
 
@@ -122,7 +122,7 @@ async function getAllInterests(adminDb: Firestore): Promise<Interest[]> {
   console.log(
     `   ✅ Found ${interests.length} interests from ${
       new Set(interests.map((i) => i.userId)).size
-    } users`
+    } users`,
   );
 
   return interests;
@@ -133,7 +133,7 @@ async function getAllInterests(adminDb: Firestore): Promise<Interest[]> {
  */
 function matchMessageToInterest(
   message: Message,
-  interest: Interest
+  interest: Interest,
 ): { matches: boolean; distance: number | null } {
   if (!message.geoJson?.features || message.geoJson.features.length === 0) {
     return { matches: false, distance: null };
@@ -146,7 +146,7 @@ function matchMessageToInterest(
   const interestCircle = turf.circle(
     interestPoint,
     interest.radius / 1000, // Convert meters to kilometers
-    { units: "kilometers" }
+    { units: "kilometers" },
   );
 
   let minDistance: number | null = null;
@@ -163,7 +163,7 @@ function matchMessageToInterest(
           distance = turf.distance(
             interestPoint,
             feature.geometry.coordinates,
-            { units: "meters" }
+            { units: "meters" },
           );
         } else {
           // For LineString and Polygon, calculate distance to centroid
@@ -190,7 +190,7 @@ function matchMessageToInterest(
  */
 async function matchMessagesWithInterests(
   messages: Message[],
-  interests: Interest[]
+  interests: Interest[],
 ): Promise<MatchResult[]> {
   console.log("\n🔍 Matching messages with interests...");
 
@@ -214,7 +214,7 @@ async function matchMessagesWithInterests(
 
       const { matches: isMatch, distance } = matchMessageToInterest(
         message,
-        interest
+        interest,
       );
 
       if (isMatch && distance !== null) {
@@ -227,13 +227,13 @@ async function matchMessagesWithInterests(
         console.log(
           `   ✅ Match: Message ${message.id.substring(
             0,
-            8
+            8,
           )} → User ${interest.userId.substring(
             0,
-            8
+            8,
           )} → Interest ${interest.id.substring(0, 8)} (${Math.round(
-            distance
-          )}m)`
+            distance,
+          )}m)`,
         );
       }
     }
@@ -266,7 +266,7 @@ function deduplicateMatches(matches: MatchResult[]): MatchResult[] {
   console.log(
     `   ✅ After deduplication: ${deduped.length} matches (removed ${
       matches.length - deduped.length
-    } duplicates)`
+    } duplicates)`,
   );
 
   return deduped;
@@ -277,7 +277,7 @@ function deduplicateMatches(matches: MatchResult[]): MatchResult[] {
  */
 async function storeNotificationMatches(
   adminDb: Firestore,
-  matches: MatchResult[]
+  matches: MatchResult[],
 ): Promise<void> {
   console.log("\n💾 Storing notification matches...");
 
@@ -302,7 +302,7 @@ async function storeNotificationMatches(
  * Get unnotified matches
  */
 async function getUnnotifiedMatches(
-  adminDb: Firestore
+  adminDb: Firestore,
 ): Promise<NotificationMatch[]> {
   console.log("\n🔔 Fetching unnotified matches...");
 
@@ -336,7 +336,7 @@ async function getUnnotifiedMatches(
  */
 async function getUserSubscriptions(
   adminDb: Firestore,
-  userId: string
+  userId: string,
 ): Promise<NotificationSubscription[]> {
   const subscriptionsRef = adminDb.collection("notificationSubscriptions");
   const snapshot = await subscriptionsRef.where("userId", "==", userId).get();
@@ -365,7 +365,7 @@ async function sendPushNotification(
   messaging: Messaging,
   subscription: NotificationSubscription,
   message: Message,
-  match: NotificationMatch
+  match: NotificationMatch,
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const messagePreview =
@@ -379,12 +379,11 @@ async function sendPushNotification(
 
     await messaging.send({
       token: subscription.token,
-      notification: {
+      data: {
         title: "Ново съобщение в Оборище",
         body: `${messagePreview}${distanceText}`,
-        imageUrl: `${APP_URL}/icon-192x192.png`,
-      },
-      data: {
+        icon: `${APP_URL}/icon-192x192.png`,
+        badge: `${APP_URL}/icon-72x72.png`,
         messageId: match.messageId,
         interestId: match.interestId,
         matchId: match.id || "",
@@ -413,7 +412,7 @@ async function sendPushNotification(
 async function sendNotifications(
   adminDb: Firestore,
   messaging: Messaging,
-  matches: NotificationMatch[]
+  matches: NotificationMatch[],
 ): Promise<void> {
   console.log("\n📤 Sending notifications...");
 
@@ -440,7 +439,7 @@ async function sendNotifications(
 
   const uniqueMatches = Array.from(notificationMap.values());
   console.log(
-    `   ℹ️  Sending ${uniqueMatches.length} unique notifications (deduplicated from ${matches.length} matches)`
+    `   ℹ️  Sending ${uniqueMatches.length} unique notifications (deduplicated from ${matches.length} matches)`,
   );
 
   // Track which matches were processed to mark them all as notified
@@ -475,7 +474,7 @@ async function sendNotifications(
 
     if (subscriptions.length === 0) {
       console.log(
-        `   ⏭️  No subscriptions for user ${match.userId.substring(0, 8)}`
+        `   ⏭️  No subscriptions for user ${match.userId.substring(0, 8)}`,
       );
       continue;
     }
@@ -489,7 +488,7 @@ async function sendNotifications(
         messaging,
         subscription,
         message,
-        match
+        match,
       );
 
       const deviceNotification: DeviceNotification = {
@@ -516,18 +515,18 @@ async function sendNotifications(
       console.log(
         `   ✅ Sent to user ${match.userId.substring(
           0,
-          8
+          8,
         )} on ${deviceSuccessCount}/${
           subscriptions.length
-        } devices for message ${match.messageId.substring(0, 8)}`
+        } devices for message ${match.messageId.substring(0, 8)}`,
       );
     } else {
       errorCount++;
       console.log(
         `   ❌ Failed to send to any device for user ${match.userId.substring(
           0,
-          8
-        )}`
+          8,
+        )}`,
       );
     }
 
@@ -613,7 +612,7 @@ export async function main(): Promise<void> {
   // Step 3: Match messages with interests
   const matches = await matchMessagesWithInterests(
     unprocessedMessages,
-    interests
+    interests,
   );
 
   if (matches.length === 0) {
