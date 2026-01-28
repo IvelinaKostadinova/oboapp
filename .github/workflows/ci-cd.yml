@@ -98,6 +98,8 @@ jobs:
         id: build
         run: |
           set -e  # Exit on error
+          # Copy shared folder into ingest for Docker build context
+          cp -r shared ingest/shared
           cd ingest
           IMAGE_TAG="latest"
           REGISTRY_URL="europe-west1-docker.pkg.dev/$PROJECT_ID/oborishte-ingest"

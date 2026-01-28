@@ -1,5 +1,8 @@
 dist/
 
+# Copied during Docker build
+shared/
+
 # Terraform state
 terraform/terraform.tfstate
 terraform/terraform.tfstate.backup

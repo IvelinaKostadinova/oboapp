@@ -13,6 +13,7 @@
     "pipeline:emergent": "tsx pipeline --emergent",
     "pipeline:all": "tsx pipeline --all",
     "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+    "build:docker": "tsc -p tsconfig.docker.json && tsc-alias -p tsconfig.docker.json",
     "prebuilt:crawl": "node dist/crawl.js",
     "prebuilt:ingest": "node dist/ingest.js",
     "prebuilt:notify": "node dist/notify.js",
