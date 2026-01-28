@@ -1,3 +1,22 @@
+import type { z } from "zod";
+import { AddressSchema } from "@shared/schema/address.schema";
+import { CoordinatesSchema } from "@shared/schema/coordinates.schema";
+import { ExtractedDataSchema } from "@shared/schema/extracted-data.schema";
+import {
+  GeoJsonFeatureCollectionSchema,
+  GeoJsonFeatureSchema,
+  GeoJsonGeometrySchema,
+  GeoJsonLineStringSchema,
+  GeoJsonMultiPointSchema,
+  GeoJsonPointSchema,
+  GeoJsonPolygonSchema,
+} from "@shared/schema/geojson.schema";
+import { MessageSnapshotSchema } from "@shared/schema/message-snapshot.schema";
+import { NotificationHistoryItemSchema } from "@shared/schema/notification-history.schema";
+import { PinSchema } from "@shared/schema/pin.schema";
+import { StreetSectionSchema } from "@shared/schema/street-section.schema";
+import { TimespanSchema } from "@shared/schema/timespan.schema";
+
 export type IngestErrorType = "warning" | "error" | "exception";
 
 export interface IngestError {
@@ -23,77 +42,35 @@ export interface Message {
   timespanEnd?: Date | string;
 }
 
-export interface Address {
-  originalText: string;
-  formattedAddress: string;
-  coordinates: {
-    lat: number;
-    lng: number;
-  };
-  geoJson?: {
-    type: "Point";
-    coordinates: [number, number]; // [longitude, latitude]
-  };
-}
+export type Address = z.infer<typeof AddressSchema>;
 
-export interface Timespan {
-  start: string;
-  end: string;
-}
+export type Timespan = z.infer<typeof TimespanSchema>;
 
-export interface Pin {
-  address: string;
-  timespans: Timespan[];
-}
+export type Pin = z.infer<typeof PinSchema>;
 
-export interface StreetSection {
-  street: string;
-  from: string;
-  to: string;
-  timespans: Timespan[];
-}
+export type StreetSection = z.infer<typeof StreetSectionSchema>;
 
-export interface ExtractedData {
-  responsible_entity: string;
-  pins: Pin[];
-  streets: StreetSection[];
-  markdown_text?: string;
-}
+export type ExtractedData = z.infer<typeof ExtractedDataSchema>;
 
 // GeoJSON Types
-export type GeoJSONGeometry = GeoJSONPoint | GeoJSONLineString | GeoJSONPolygon;
+export type GeoJSONGeometry = z.infer<typeof GeoJsonGeometrySchema>;
 
-export interface GeoJSONPoint {
-  type: "Point";
-  coordinates: [number, number]; // [longitude, latitude]
-}
+export type GeoJSONPoint = z.infer<typeof GeoJsonPointSchema>;
 
-export interface GeoJSONLineString {
-  type: "LineString";
-  coordinates: [number, number][]; // array of [longitude, latitude]
-}
+export type GeoJSONMultiPoint = z.infer<typeof GeoJsonMultiPointSchema>;
 
-export interface GeoJSONPolygon {
-  type: "Polygon";
-  coordinates: [number, number][][]; // array of rings, each ring is array of [longitude, latitude]
-}
+export type GeoJSONLineString = z.infer<typeof GeoJsonLineStringSchema>;
 
-export interface GeoJSONFeature {
-  type: "Feature";
-  geometry: GeoJSONGeometry;
-  properties: Record<string, any>;
-}
+export type GeoJSONPolygon = z.infer<typeof GeoJsonPolygonSchema>;
 
-export interface GeoJSONFeatureCollection {
-  type: "FeatureCollection";
-  features: GeoJSONFeature[];
-}
+export type GeoJSONFeature = z.infer<typeof GeoJsonFeatureSchema>;
+
+export type GeoJSONFeatureCollection = z.infer<
+  typeof GeoJsonFeatureCollectionSchema
+>;
 
 // Intersection coordinates
-export interface IntersectionCoordinates {
-  lat: number;
-  lng: number;
-}
+export type IntersectionCoordinates = z.infer<typeof CoordinatesSchema>;
 
 // User Interest (area of interest on the map)
 export interface Interest {
@@ -134,12 +111,7 @@ export interface DeviceNotification {
 }
 
 // Message Snapshot (denormalized message data)
-export interface MessageSnapshot {
-  text: string;
-  source?: string;
-  sourceUrl?: string;
-  createdAt: string;
-}
+export type MessageSnapshot = z.infer<typeof MessageSnapshotSchema>;
 
 // Notification Match (message matched to user's interest)
 export interface NotificationMatch {
@@ -157,15 +129,9 @@ export interface NotificationMatch {
 }
 
 // Notification History Item (for API response)
-export interface NotificationHistoryItem {
-  id: string;
-  messageId: string;
-  messageSnapshot: MessageSnapshot;
-  notifiedAt: string;
-  distance?: number;
-  interestId: string;
-  successfulDevicesCount: number;
-}
+export type NotificationHistoryItem = z.infer<
+  typeof NotificationHistoryItemSchema
+>;
 
 // Source Configuration
 export interface SourceConfig {
