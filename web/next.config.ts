@@ -15,6 +15,16 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Production optimizations
+  compiler: {
+    // Remove debug console logs in production, keep error/warn for monitoring
+    removeConsole:
+      process.env.NODE_ENV === "production"
+        ? {
+            exclude: ["error", "warn"],
+          }
+        : false,
+  },
 };
 
 const withMDX = createMDX({
