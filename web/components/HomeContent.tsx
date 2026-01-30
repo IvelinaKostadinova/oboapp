@@ -13,6 +13,7 @@ import { useMessages } from "@/lib/hooks/useMessages";
 import { useMapNavigation } from "@/lib/hooks/useMapNavigation";
 import { useInterestManagement } from "@/lib/hooks/useInterestManagement";
 import { useCategoryFilter } from "@/lib/hooks/useCategoryFilter";
+import { classifyMessage } from "@/lib/message-classification";
 
 /**
  * HomeContent - Main application component managing map, messages, and user interactions
@@ -53,14 +54,21 @@ export default function HomeContent() {
     setSelectedCategories,
   } = useMessages();
 
-  // Category filtering
-  // - availableCategories: From /api/categories (all categories that exist)
-  // - messages: Viewport messages (used for counting per category)
+  // Category filtering hook (manages UI state and category selection)
   const categoryFilter = useCategoryFilter(
     availableCategories,
-    messages,
+    messages, // Pass all messages initially - we'll filter within the hook
     setSelectedCategories,
   );
+
+  // Filter archived messages based on toggle state
+  const filteredMessages = useMemo(() => {
+    if (categoryFilter.showArchived) {
+      return messages; // Show all messages
+    }
+    // Filter out archived messages
+    return messages.filter((message) => classifyMessage(message) === "active");
+  }, [messages, categoryFilter.showArchived]);
 
   // Map navigation and centering
   const {
@@ -147,8 +155,10 @@ export default function HomeContent() {
         hasActiveFilters={categoryFilter.hasActiveFilters}
         isInitialLoad={categoryFilter.isInitialLoad}
         isLoadingCounts={categoryFilter.isLoadingCounts}
+        showArchived={categoryFilter.showArchived}
         onTogglePanel={categoryFilter.togglePanel}
         onToggleCategory={categoryFilter.toggleCategory}
+        onToggleShowArchived={categoryFilter.toggleShowArchived}
       />
 
       {/* Map - Takes viewport height to allow scrolling */}
@@ -157,7 +167,7 @@ export default function HomeContent() {
         style={{ height: "calc(100vh - 120px)", minHeight: "500px" }}
       >
         <MapContainer
-          messages={messages}
+          messages={filteredMessages}
           interests={interests}
           interestsLoaded={interestsLoaded}
           user={user}
@@ -180,7 +190,7 @@ export default function HomeContent() {
 
       {/* Messages Grid - Below the map */}
       <MessagesGrid
-        messages={messages}
+        messages={filteredMessages}
         isLoading={isLoading}
         onMessageClick={(message) => {
           router.push(`/?messageId=${message.id}`, { scroll: false });
