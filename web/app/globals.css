@@ -161,3 +161,24 @@ body {
   -webkit-user-select: none;
   -webkit-touch-callout: none;
 }
+
+/* Mobile Safari overflow fixes */
+/* Apply min-width: 0 only to text container elements to prevent overflow */
+/* This allows flex/grid children to shrink below their content size */
+
+/* Ensure proper word breaking for long content on mobile */
+p,
+li {
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+}
+
+/* Smooth scrolling for touch devices */
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Hide scrollbars while maintaining scroll functionality */
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}

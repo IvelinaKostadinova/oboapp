@@ -1,7 +1,13 @@
 "use client";
 
-import React, { useCallback, useMemo, useRef, useState } from "react";
-import { GoogleMap } from "@react-google-maps/api";
+import React, {
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  useEffect,
+} from "react";
+import { GoogleMap, Circle } from "@react-google-maps/api";
 import { Message, Interest } from "@/lib/types";
 import { SOFIA_BOUNDS } from "@/lib/bounds-utils";
 import GeoJSONLayer from "./GeoJSONLayer";
@@ -37,6 +43,7 @@ interface MapComponentProps {
     onCancel: () => void;
   };
   readonly initialCenter?: { lat: number; lng: number };
+  readonly shouldTrackLocation?: boolean;
 }
 
 // Oborishte District center coordinates
@@ -103,11 +110,17 @@ export default function MapComponent({
   onInterestClick,
   targetMode,
   initialCenter,
+  shouldTrackLocation = false,
 }: MapComponentProps) {
   const mapRef = useRef<google.maps.Map | null>(null);
   const latestCenterRef = useRef(SOFIA_CENTER);
   const [currentZoom, setCurrentZoom] = useState<number>(14);
   const [mapInstance, setMapInstance] = useState<google.maps.Map | null>(null);
+  const [userLocation, setUserLocation] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
+
   const mapOptions: google.maps.MapOptions = useMemo(
     () => ({
       zoom: 14,
@@ -222,6 +235,38 @@ export default function MapComponent({
     });
   }, [onBoundsChanged]);
 
+  // Track user location - only when explicitly enabled (after user clicks locate button)
+  useEffect(() => {
+    if (!shouldTrackLocation || !navigator.geolocation) {
+      return;
+    }
+
+    // Use watchPosition for battery-efficient location tracking
+    // It only updates when position actually changes
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        setUserLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+      },
+      (error) => {
+        console.error("Error watching location:", error);
+      },
+      {
+        enableHighAccuracy: false, // Accept coarse location to save battery
+        timeout: 10000,
+        maximumAge: 60000, // Cache for 1 minute
+      },
+    );
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+      // Clear user location when tracking stops
+      setUserLocation(null);
+    };
+  }, [shouldTrackLocation]);
+
   return (
     <div className="absolute inset-0">
       {process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ? (
@@ -258,6 +303,61 @@ export default function MapComponent({
               onCancel={targetMode.onCancel}
             />
           )}
+
+          {/* User location blue dot */}
+          {userLocation &&
+            (() => {
+              // Scale radius based on zoom level to remain visible at all zooms
+              // At zoom 18 (max): 8m, at zoom 12 (min): 50m - linear scale
+              const minZoom = 12;
+              const maxZoom = 18;
+              const minRadius = 50;
+              const maxRadius = 8;
+              const zoomRange = maxZoom - minZoom;
+              const radiusRange = minRadius - maxRadius;
+              // Clamp currentZoom to minZoom-maxZoom range to ensure radius stays within bounds
+              const clampedZoom = Math.max(
+                minZoom,
+                Math.min(maxZoom, currentZoom),
+              );
+              const baseRadius =
+                minRadius - ((clampedZoom - minZoom) / zoomRange) * radiusRange;
+              const outerRadius = baseRadius * 2;
+              const innerRadius = baseRadius * 0.4;
+
+              return (
+                <>
+                  {/* Outer pulse circle */}
+                  <Circle
+                    center={userLocation}
+                    radius={outerRadius}
+                    options={{
+                      fillColor: "#4285F4",
+                      fillOpacity: 0.2,
+                      strokeColor: "#4285F4",
+                      strokeOpacity: 0.4,
+                      strokeWeight: 1,
+                      clickable: false,
+                      zIndex: 1000,
+                    }}
+                  />
+                  {/* Inner solid circle */}
+                  <Circle
+                    center={userLocation}
+                    radius={innerRadius}
+                    options={{
+                      fillColor: "#4285F4",
+                      fillOpacity: 1,
+                      strokeColor: "#FFFFFF",
+                      strokeOpacity: 1,
+                      strokeWeight: 2,
+                      clickable: false,
+                      zIndex: 1001,
+                    }}
+                  />
+                </>
+              );
+            })()}
         </GoogleMap>
       ) : (
         <div className="w-full h-full flex items-center justify-center bg-gray-100">

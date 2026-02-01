@@ -17,7 +17,7 @@ interface MessageCardProps {
 
 export function MessageCardSkeleton() {
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 border border-neutral-border">
+    <div className="bg-white rounded-lg shadow-md p-6 border border-neutral-border overflow-clip">
       <div className="space-y-4 animate-pulse">
         {/* Source logo skeleton */}
         <div className="flex items-center space-x-3">
@@ -121,33 +121,33 @@ export default function MessageCard({
   return (
     <button
       type="button"
-      className="bg-white rounded-lg shadow-md p-6 border border-neutral-border hover:shadow-lg transition-shadow cursor-pointer w-full text-left relative h-full flex flex-col"
+      className="bg-white rounded-lg shadow-md p-4 border border-neutral-border hover:shadow-lg transition-shadow cursor-pointer w-full text-left relative h-full flex flex-col min-w-0 overflow-clip"
       onClick={handleClick}
     >
       {/* Status indicator circle (top-right) */}
       <div
-        className={`absolute top-3 right-3 w-3 h-3 rounded-full ${
+        className={`absolute top-2 right-2 w-2.5 h-2.5 rounded-full ${
           isActive ? "bg-destructive" : "bg-neutral"
         }`}
       />
 
-      <div className="flex flex-1 flex-col">
-        <div className="space-y-4">
+      <div className="flex flex-1 flex-col min-w-0">
+        <div className="space-y-3 min-w-0">
           {/* Source */}
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2">
             {logoPath && !logoError ? (
               <Image
                 src={logoPath}
                 alt={sourceInfo?.name || message.source || "Source"}
-                width={40}
-                height={40}
-                className="w-10 h-10 object-contain flex-shrink-0"
+                width={32}
+                height={32}
+                className="w-8 h-8 object-contain flex-shrink-0"
                 onError={() => setLogoError(true)}
               />
             ) : (
-              <div className="w-10 h-10 bg-neutral-light rounded flex items-center justify-center flex-shrink-0">
+              <div className="w-8 h-8 bg-neutral-light rounded flex items-center justify-center flex-shrink-0">
                 <svg
-                  className="w-6 h-6 text-gray-400"
+                  className="w-5 h-5 text-gray-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -173,11 +173,13 @@ export default function MessageCard({
           )}
 
           {/* Text snippet */}
-          <p className="text-sm text-neutral line-clamp-3">{snippet}</p>
+          <p className="text-sm text-neutral line-clamp-3 break-words overflow-wrap-anywhere">
+            {snippet}
+          </p>
 
           {/* Timestamp */}
           {formattedDate && (
-            <p className="text-xs text-neutral">{formattedDate}</p>
+            <p className="text-xs text-neutral break-words">{formattedDate}</p>
           )}
         </div>
 

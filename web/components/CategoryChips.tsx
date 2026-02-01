@@ -65,19 +65,20 @@ export default function CategoryChips({
   }
 
   return (
-    <div className={`relative ${className ?? ""}`}>
+    <div className={`relative min-w-0 -mx-1 px-1 ${className ?? ""}`}>
       <div
         ref={containerRef}
         data-category-scroll
-        className="flex flex-nowrap gap-2 overflow-x-auto whitespace-nowrap"
+        className="flex flex-nowrap gap-1.5 overflow-x-auto whitespace-nowrap -webkit-overflow-scrolling-touch scrollbar-hidden"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
         {categories.map((category) => {
           if (!isCategory(category)) return null;
-          
+
           return (
             <span
               key={category}
-              className="inline-flex items-center gap-1.5 px-1.5 py-1 text-xs font-normal rounded-full border bg-white whitespace-nowrap"
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-normal rounded-full border bg-white whitespace-nowrap"
               style={{
                 borderColor: getCategoryColor(category),
                 color: "inherit",
@@ -90,7 +91,7 @@ export default function CategoryChips({
                 });
               }}
             >
-              <CategoryIcon category={category} size={16} showBackground />
+              <CategoryIcon category={category} size={14} showBackground />
               {CATEGORY_LABELS[category]}
             </span>
           );

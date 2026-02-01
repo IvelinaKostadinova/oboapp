@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useRef, useMemo } from "react";
+import React, { useCallback, useRef, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import MapContainer from "@/components/MapContainer";
 import MessageDetailView from "@/components/MessageDetailView";
 import MessagesGrid from "@/components/MessagesGrid";
 import InterestContextMenu from "@/components/InterestContextMenu";
 import CategoryFilterBox from "@/components/CategoryFilterBox";
+import GeolocationPrompt from "@/components/GeolocationPrompt";
 import { useInterests } from "@/lib/hooks/useInterests";
 import { useAuth } from "@/lib/auth-context";
 import { useMessages } from "@/lib/hooks/useMessages";
@@ -79,6 +80,13 @@ export default function HomeContent() {
     handleAddressClick,
   } = useMapNavigation();
 
+  // Geolocation prompt state (lifted from MapContainer for proper DOM ordering)
+  const [geolocationPrompt, setGeolocationPrompt] = React.useState<{
+    show: boolean;
+    onAccept: () => void;
+    onDecline: () => void;
+  } | null>(null);
+
   // Interest/zone management
   const {
     targetMode,
@@ -128,10 +136,13 @@ export default function HomeContent() {
   }, [searchParams, messages]);
 
   return (
-    <div className="flex-1 flex flex-col overflow-y-auto" ref={containerRef}>
+    <div
+      className="flex-1 flex flex-col [@media(min-width:1280px)_and_(min-aspect-ratio:4/3)]:flex-row"
+      ref={containerRef}
+    >
       {/* Error messages */}
       {(error || categoriesError) && (
-        <div className="bg-white border-b shadow-sm z-10">
+        <div className="bg-white border-b shadow-sm z-10 [@media(min-width:1280px)_and_(min-aspect-ratio:4/3)]:absolute [@media(min-width:1280px)_and_(min-aspect-ratio:4/3)]:top-0 [@media(min-width:1280px)_and_(min-aspect-ratio:4/3)]:left-0 [@media(min-width:1280px)_and_(min-aspect-ratio:4/3)]:right-0">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             {error && (
               <div className="p-4 bg-error-light text-error rounded-md mb-2">
@@ -147,25 +158,22 @@ export default function HomeContent() {
         </div>
       )}
 
-      {/* Category Filter Box */}
-      <CategoryFilterBox
-        isOpen={categoryFilter.isOpen}
-        selectedCategories={categoryFilter.selectedCategories}
-        categoryCounts={categoryFilter.categoryCounts}
-        hasActiveFilters={categoryFilter.hasActiveFilters}
-        isInitialLoad={categoryFilter.isInitialLoad}
-        isLoadingCounts={categoryFilter.isLoadingCounts}
-        showArchived={categoryFilter.showArchived}
-        onTogglePanel={categoryFilter.togglePanel}
-        onToggleCategory={categoryFilter.toggleCategory}
-        onToggleShowArchived={categoryFilter.toggleShowArchived}
-      />
+      {/* Map Section - Left side on desktop, top on mobile */}
+      <div className="relative [@media(min-width:1280px)_and_(min-aspect-ratio:4/3)]:w-3/5 h-[calc(66vh-64px)] [@media(min-width:1280px)_and_(min-aspect-ratio:4/3)]:h-[calc(100vh-80px)] [@media(min-width:1280px)_and_(min-aspect-ratio:4/3)]:sticky [@media(min-width:1280px)_and_(min-aspect-ratio:4/3)]:top-0 [@media(min-width:1280px)_and_(min-aspect-ratio:4/3)]:self-start">
+        {/* Category Filter Box */}
+        <CategoryFilterBox
+          isOpen={categoryFilter.isOpen}
+          selectedCategories={categoryFilter.selectedCategories}
+          categoryCounts={categoryFilter.categoryCounts}
+          hasActiveFilters={categoryFilter.hasActiveFilters}
+          isInitialLoad={categoryFilter.isInitialLoad}
+          isLoadingCounts={categoryFilter.isLoadingCounts}
+          showArchived={categoryFilter.showArchived}
+          onTogglePanel={categoryFilter.togglePanel}
+          onToggleCategory={categoryFilter.toggleCategory}
+          onToggleShowArchived={categoryFilter.toggleShowArchived}
+        />
 
-      {/* Map - Takes viewport height to allow scrolling */}
-      <div
-        className="relative shadow-md"
-        style={{ height: "calc(100vh - 120px)", minHeight: "500px" }}
-      >
         <MapContainer
           messages={filteredMessages}
           interests={interests}
@@ -180,6 +188,7 @@ export default function HomeContent() {
           onSaveInterest={handleSaveInterest}
           onCancelTargetMode={handleCancelTargetMode}
           onStartAddInterest={handleStartAddInterest}
+          onGeolocationPromptChange={setGeolocationPrompt}
         />
         {isLoading && (
           <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-white px-4 py-2 rounded-lg shadow-md z-20">
@@ -188,14 +197,19 @@ export default function HomeContent() {
         )}
       </div>
 
-      {/* Messages Grid - Below the map */}
-      <MessagesGrid
-        messages={filteredMessages}
-        isLoading={isLoading}
-        onMessageClick={(message) => {
-          router.push(`/?messageId=${message.id}`, { scroll: false });
-        }}
-      />
+      {/* Events Sidebar - Right side on desktop, bottom on mobile */}
+      <div className="flex-1 [@media(min-width:1280px)_and_(min-aspect-ratio:4/3)]:flex-none [@media(min-width:1280px)_and_(min-aspect-ratio:4/3)]:w-2/5 bg-white overflow-y-auto">
+        <div className="p-6 @container">
+          <MessagesGrid
+            messages={filteredMessages}
+            isLoading={isLoading}
+            onMessageClick={(message) => {
+              router.push(`/?messageId=${message.id}`, { scroll: false });
+            }}
+            variant="list"
+          />
+        </div>
+      </div>
 
       {/* Message Detail View */}
       <MessageDetailView
@@ -211,6 +225,14 @@ export default function HomeContent() {
           onMove={handleMoveInterest}
           onDelete={handleDeleteInterest}
           onClose={handleCloseInterestMenu}
+        />
+      )}
+
+      {/* Geolocation Prompt - rendered last for proper z-index stacking */}
+      {geolocationPrompt?.show && (
+        <GeolocationPrompt
+          onAccept={geolocationPrompt.onAccept}
+          onDecline={geolocationPrompt.onDecline}
         />
       )}
     </div>
