@@ -6,21 +6,31 @@ import { CATEGORIES } from "@/lib/category-constants";
  * GET /api/categories
  *
  * Returns list of categories that exist in the database (have at least one finalized message).
- * Fetches all finalized messages and extracts unique categories in memory.
- * This approach uses only the basic finalizedAt != null query, avoiding the need for
- * additional composite indexes for category counting.
+ * Reads from pre-computed aggregation document (1 read) instead of scanning all messages.
+ * Falls back to full scan if aggregation document doesn't exist yet.
  *
  * Response: { categories: string[] }
  */
 export async function GET() {
   try {
-    const messagesRef = adminDb.collection("messages");
+    // Read from aggregation document (1 read instead of N)
+    const aggregationDoc = await adminDb.doc("aggregations/categoryStats").get();
 
-    // Fetch all finalized messages
-    // This uses only the existing finalizedAt != null query, which works without additional indexes
+    if (aggregationDoc.exists) {
+      const data = aggregationDoc.data();
+      const categories = ((data?.categories as string[]) || []).filter(
+        (c) =>
+          c === "uncategorized" ||
+          CATEGORIES.includes(c as (typeof CATEGORIES)[number]),
+      );
+      return NextResponse.json({ categories });
+    }
+
+    // Fallback to full scan if aggregation doesn't exist yet
+    // (runs once before migration, or if aggregation doc is deleted)
+    const messagesRef = adminDb.collection("messages");
     const snapshot = await messagesRef.where("finalizedAt", "!=", null).get();
 
-    // Extract unique categories in memory
     const categorySet = new Set<string>();
 
     snapshot.forEach((doc) => {
@@ -32,10 +42,8 @@ export async function GET() {
         !Array.isArray(categories) ||
         categories.length === 0
       ) {
-        // Uncategorized message
         categorySet.add("uncategorized");
       } else {
-        // Real categories
         for (const category of categories) {
           if (CATEGORIES.includes(category)) {
             categorySet.add(category);
