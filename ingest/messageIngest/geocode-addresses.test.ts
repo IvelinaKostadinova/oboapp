@@ -1,6 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
-import { findMissingStreetEndpoints } from "./geocode-addresses";
-import type { StreetSection } from "@/lib/types";
+import {
+  findMissingStreetEndpoints,
+  deduplicateAddresses,
+} from "./geocode-addresses";
+import type { StreetSection, Address } from "@/lib/types";
 
 // Mock firebase-admin to avoid requiring env vars
 vi.mock("@/lib/firebase-admin", () => ({
@@ -129,5 +132,87 @@ describe(findMissingStreetEndpoints, () => {
     const result = findMissingStreetEndpoints(streets, geocodedMap);
     // Should include duplicates as they're processed per street
     expect(result).toEqual(["Corner B", "Corner C"]);
+  });
+});
+
+// Helper to create test addresses
+function createAddress(
+  text: string,
+  lat: number,
+  lng: number,
+): Address {
+  return {
+    originalText: text,
+    formattedAddress: text,
+    coordinates: { lat, lng },
+    geoJson: { type: "Point", coordinates: [lng, lat] },
+  };
+}
+
+describe(deduplicateAddresses, () => {
+  it("should return empty array for empty input", () => {
+    const result = deduplicateAddresses([]);
+    expect(result).toEqual([]);
+  });
+
+  it("should return single address unchanged", () => {
+    const addresses = [createAddress("123 Main St", 42.0, 23.0)];
+    const result = deduplicateAddresses(addresses);
+    expect(result).toHaveLength(1);
+    expect(result[0].originalText).toBe("123 Main St");
+  });
+
+  it("should remove exact text duplicates (case insensitive)", () => {
+    const addresses = [
+      createAddress("123 Main St", 42.0, 23.0),
+      createAddress("123 MAIN ST", 42.1, 23.1),
+      createAddress("123 main st", 42.2, 23.2),
+    ];
+    const result = deduplicateAddresses(addresses);
+    expect(result).toHaveLength(1);
+    expect(result[0].originalText).toBe("123 Main St");
+  });
+
+  it("should remove addresses within distance threshold (~50m)", () => {
+    // ~0.0005 degrees is roughly 50m at Sofia's latitude
+    const addresses = [
+      createAddress("Address A", 42.7, 23.3),
+      createAddress("Address B", 42.70004, 23.30004), // ~50m away
+    ];
+    const result = deduplicateAddresses(addresses);
+    expect(result).toHaveLength(1);
+    expect(result[0].originalText).toBe("Address A");
+  });
+
+  it("should keep addresses beyond distance threshold", () => {
+    // ~0.001 degrees is roughly 100m at Sofia's latitude
+    const addresses = [
+      createAddress("Address A", 42.7, 23.3),
+      createAddress("Address B", 42.701, 23.301), // ~100m away
+    ];
+    const result = deduplicateAddresses(addresses);
+    expect(result).toHaveLength(2);
+  });
+
+  it("should handle mix of text and coordinate duplicates", () => {
+    const addresses = [
+      createAddress("Location 1", 42.7, 23.3),
+      createAddress("LOCATION 1", 42.8, 23.4), // text duplicate
+      createAddress("Location 2", 42.70003, 23.30003), // coordinate duplicate of Location 1
+      createAddress("Location 3", 42.9, 23.5), // unique
+    ];
+    const result = deduplicateAddresses(addresses);
+    expect(result).toHaveLength(2);
+    expect(result.map((a) => a.originalText)).toContain("Location 1");
+    expect(result.map((a) => a.originalText)).toContain("Location 3");
+  });
+
+  it("should trim whitespace when comparing text", () => {
+    const addresses = [
+      createAddress("  Main St  ", 42.0, 23.0),
+      createAddress("Main St", 42.1, 23.1),
+    ];
+    const result = deduplicateAddresses(addresses);
+    expect(result).toHaveLength(1);
   });
 });

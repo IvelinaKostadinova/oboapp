@@ -21,6 +21,67 @@ export interface GeocodingResult {
 }
 
 /**
+ * Helper: Deduplicate addresses by normalized text or close coordinates
+ * Exported for unit testing
+ */
+export function deduplicateAddresses(addresses: Address[]): Address[] {
+  const seen = new Map<string, Address>();
+  const DISTANCE_THRESHOLD_METERS = 50;
+
+  for (const addr of addresses) {
+    const normalizedText = addr.originalText.toLowerCase().trim();
+
+    // Check if we've seen this exact text
+    if (seen.has(normalizedText)) {
+      continue;
+    }
+
+    // Check if any existing address is within distance threshold
+    let isDuplicate = false;
+    for (const existing of seen.values()) {
+      const dist = haversineDistance(
+        addr.coordinates.lat,
+        addr.coordinates.lng,
+        existing.coordinates.lat,
+        existing.coordinates.lng,
+      );
+      if (dist < DISTANCE_THRESHOLD_METERS) {
+        isDuplicate = true;
+        break;
+      }
+    }
+
+    if (!isDuplicate) {
+      seen.set(normalizedText, addr);
+    }
+  }
+
+  return Array.from(seen.values());
+}
+
+/**
+ * Calculate distance between two coordinates using Haversine formula
+ */
+function haversineDistance(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
+): number {
+  const R = 6371000; // Earth's radius in meters
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+/**
  * Helper: Find missing street endpoints that haven't been geocoded
  * Exported for unit testing
  */
@@ -137,5 +198,8 @@ export async function geocodeAddressesFromExtractedData(
     );
   }
 
-  return { preGeocodedMap, addresses, cadastralGeometries };
+  // Deduplicate addresses before returning
+  const deduplicatedAddresses = deduplicateAddresses(addresses);
+
+  return { preGeocodedMap, addresses: deduplicatedAddresses, cadastralGeometries };
 }
