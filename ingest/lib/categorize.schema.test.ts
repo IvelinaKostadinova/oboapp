@@ -187,6 +187,30 @@ describe("CategorizationResponseSchema", () => {
       expect(result.success).toBe(true);
     });
 
+    it("should default omitted address fields to empty arrays", () => {
+      // This simulates AI output when withSpecificAddress is false
+      const dataWithOmittedFields = [
+        {
+          categories: ["water"],
+          withSpecificAddress: false,
+          cityWide: false,
+          isRelevant: true,
+          normalizedText: "General water maintenance.",
+        },
+      ];
+
+      const result = CategorizationResponseSchema.safeParse(
+        dataWithOmittedFields,
+      );
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data[0].specificAddresses).toEqual([]);
+        expect(result.data[0].coordinates).toEqual([]);
+        expect(result.data[0].busStops).toEqual([]);
+        expect(result.data[0].cadastralProperties).toEqual([]);
+      }
+    });
+
     it("should validate various coordinate formats", () => {
       const validCoordinates = [
         "42.6977, 23.3219",
