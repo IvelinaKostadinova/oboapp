@@ -54,8 +54,8 @@ COPY shared ./shared
 # Copy ingest package files
 COPY ingest/package*.json ./ingest/
 
-# Install only production dependencies
-RUN npm ci --production
+# Install only production dependencies (skip postinstall since shared is already built)
+RUN npm ci --production --ignore-scripts
 
 # Copy Playwright browser cache
 COPY --from=builder /root/.cache/ms-playwright /root/.cache/ms-playwright
