@@ -106,11 +106,8 @@ jobs:
           echo "Full image: $REGISTRY_URL/$IMAGE_NAME:$IMAGE_TAG"
           echo "========================================="
 
-          # Submit build from repo root with ingest/Dockerfile
-          if gcloud builds submit \
-            --config=- \
-            --substitutions=_IMAGE_TAG=$IMAGE_TAG,_REGISTRY_URL=$REGISTRY_URL,_IMAGE_NAME=$IMAGE_NAME \
-            . <<EOF
+          # Create inline cloudbuild config
+          cat > /tmp/cloudbuild.yaml << 'EOF'
           steps:
             - name: 'gcr.io/cloud-builders/docker'
               args: 
@@ -127,14 +124,15 @@ jobs:
           images:
             - '$_REGISTRY_URL/$_IMAGE_NAME:$_IMAGE_TAG'
           EOF
-          then
-            echo "========================================="
-            echo "✅ Image built and tagged as $IMAGE_TAG"
-            echo "========================================="
-          else
-            echo "❌ Build failed!"
-            exit 1
-          fi
+
+          # Submit build from repo root with ingest/Dockerfile
+          gcloud builds submit \
+            --config=/tmp/cloudbuild.yaml \
+            --substitutions=_IMAGE_TAG=$IMAGE_TAG,_REGISTRY_URL=$REGISTRY_URL,_IMAGE_NAME=$IMAGE_NAME \
+            .
+
+          echo "========================================="
+          echo "✅ Image built and tagged as $IMAGE_TAG"
           echo "========================================="
 
           echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
