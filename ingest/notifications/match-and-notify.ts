@@ -76,7 +76,9 @@ async function sendNotifications(
     // Get message details
     const messageDoc = await messagesRef.doc(match.messageId).get();
     if (!messageDoc.exists) {
-      logger.warn("Message not found for notification", { messageId: match.messageId });
+      logger.warn("Message not found for notification", {
+        messageId: match.messageId,
+      });
       continue;
     }
 
@@ -104,7 +106,7 @@ async function sendNotifications(
       });
     } else {
       errorCount++;
-      logger.error("Failed to send to any device", {
+      logger.warn("Failed to send to any device", {
         userId: match.userId.substring(0, 8),
         messageId: match.messageId.substring(0, 8),
       });
@@ -225,7 +227,9 @@ if (require.main === module) {
     try {
       await main();
     } catch (error) {
-      logger.error("Fatal error in notification processing", { error: error instanceof Error ? error.message : String(error) });
+      logger.error("Fatal error in notification processing", {
+        error: error instanceof Error ? error.message : String(error),
+      });
       process.exit(1);
     }
   })();
