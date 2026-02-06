@@ -100,10 +100,17 @@ resource "google_project_iam_member" "firestore_user" {
   member  = "serviceAccount:${google_service_account.ingest_runner.email}"
 }
 
-# Grant Cloud Run Invoker (for scheduler to trigger workflows and workflows to invoke jobs)
+# Grant Cloud Run Invoker (for workflows to invoke jobs)
 resource "google_project_iam_member" "run_invoker" {
   project = var.project_id
   role    = "roles/run.invoker"
+  member  = "serviceAccount:${google_service_account.ingest_runner.email}"
+}
+
+# Grant Workflows Invoker (for scheduler to trigger workflows)
+resource "google_project_iam_member" "workflows_invoker" {
+  project = var.project_id
+  role    = "roles/workflows.invoker"
   member  = "serviceAccount:${google_service_account.ingest_runner.email}"
 }
 
@@ -111,6 +118,20 @@ resource "google_project_iam_member" "run_invoker" {
 resource "google_project_iam_member" "secret_accessor" {
   project = var.project_id
   role    = "roles/secretmanager.secretAccessor"
+  member  = "serviceAccount:${google_service_account.ingest_runner.email}"
+}
+
+# Grant Artifact Registry read access (Cloud Run pulls container images)
+resource "google_project_iam_member" "artifact_registry_reader" {
+  project = var.project_id
+  role    = "roles/artifactregistry.reader"
+  member  = "serviceAccount:${google_service_account.ingest_runner.email}"
+}
+
+# Grant Service Account User (scheduler impersonates SA to trigger workflows)
+resource "google_project_iam_member" "service_account_user" {
+  project = var.project_id
+  role    = "roles/iam.serviceAccountUser"
   member  = "serviceAccount:${google_service_account.ingest_runner.email}"
 }
 
