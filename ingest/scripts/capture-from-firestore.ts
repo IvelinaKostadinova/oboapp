@@ -16,8 +16,7 @@ async function main() {
 
   // Dynamic imports to ensure dotenv loads first
   const { adminDb } = await import("@/lib/firebase-admin");
-  const { categorize, extractStructuredData } =
-    await import("@/lib/ai-service");
+  const { filterAndSplit, extractLocations } = await import("@/lib/ai-service");
   const { geocodeAddress } = await import("@/lib/geocoding-service");
   const { overpassGeocodeAddresses } =
     await import("@/lib/overpass-geocoding-service");
@@ -44,9 +43,7 @@ async function main() {
   const msgWithBusStops = recentMessages.docs.find((doc) => {
     const data = doc.data();
     return (
-      data.categorize?.busStops &&
-      Array.isArray(data.categorize.busStops) &&
-      data.categorize.busStops.length > 0
+      data.busStops && Array.isArray(data.busStops) && data.busStops.length > 0
     );
   });
 
@@ -54,9 +51,7 @@ async function main() {
     const msg = msgWithBusStops.data();
     console.log(`  Found message: ${msgWithBusStops.id}`);
     console.log(`  Source: ${msg.source}`);
-    console.log(
-      `  BusStops: ${msg.categorize?.busStops?.join(", ") || "none"}`,
-    );
+    console.log(`  BusStops: ${msg.busStops?.join(", ") || "none"}`);
 
     if (msg.sourceDocumentId && msg.source) {
       const sourceDoc = await adminDb
@@ -68,10 +63,10 @@ async function main() {
 
       if (sourceDoc.exists) {
         const sourceData = sourceDoc.data();
-        console.log(`  Re-categorizing source text...`);
-        const categorizeResult = await categorize(sourceData?.text || msg.text);
-        writeFixture("gemini/categorize-with-busstops.json", categorizeResult);
-        console.log("  ✓ Saved categorize-with-busstops.json");
+        console.log(`  Re-processing source text...`);
+        const filterResult = await filterAndSplit(sourceData?.text || msg.text);
+        writeFixture("gemini/filter-split-with-busstops.json", filterResult);
+        console.log("  ✓ Saved filter-split-with-busstops.json");
       }
     }
   } else {
@@ -83,9 +78,9 @@ async function main() {
   const msgWithCadastral = recentMessages.docs.find((doc) => {
     const data = doc.data();
     return (
-      data.extractedData?.cadastralProperties &&
-      Array.isArray(data.extractedData.cadastralProperties) &&
-      data.extractedData.cadastralProperties.length > 0
+      data.cadastralProperties &&
+      Array.isArray(data.cadastralProperties) &&
+      data.cadastralProperties.length > 0
     );
   });
 
@@ -93,14 +88,12 @@ async function main() {
     const msg = msgWithCadastral.data();
     console.log(`  Found message: ${msgWithCadastral.id}`);
     console.log(
-      `  Cadastral properties: ${msg.extractedData?.cadastralProperties?.length || 0}`,
+      `  Cadastral properties: ${msg.cadastralProperties?.length || 0}`,
     );
 
-    if (msg.categorize?.normalizedText) {
-      console.log(`  Extracting data...`);
-      const extracted = await extractStructuredData(
-        msg.categorize.normalizedText,
-      );
+    if (msg.plainText) {
+      console.log(`  Extracting locations...`);
+      const extracted = await extractLocations(msg.plainText);
       writeFixture("gemini/extract-with-cadastral.json", extracted);
       console.log("  ✓ Saved extract-with-cadastral.json");
 
@@ -128,19 +121,17 @@ async function main() {
   const msgWithStreets = recentMessages.docs.find((doc) => {
     const data = doc.data();
     return (
-      data.extractedData?.streets &&
-      Array.isArray(data.extractedData.streets) &&
-      data.extractedData.streets.length > 0
+      data.streets && Array.isArray(data.streets) && data.streets.length > 0
     );
   });
 
   if (msgWithStreets) {
     const msg = msgWithStreets.data();
     console.log(`  Found message: ${msgWithStreets.id}`);
-    console.log(`  Streets: ${msg.extractedData?.streets?.length || 0}`);
+    console.log(`  Streets: ${msg.streets?.length || 0}`);
 
-    if (msg.extractedData?.streets && msg.extractedData.streets.length > 0) {
-      const street = msg.extractedData.streets[0];
+    if (msg.streets && msg.streets.length > 0) {
+      const street = msg.streets[0];
       const streetName = street.street;
       console.log(`  Geocoding street: ${streetName}...`);
       try {
@@ -152,8 +143,8 @@ async function main() {
       }
 
       // Try intersection if available
-      if (street.intersections && street.intersections.length > 0) {
-        const intersection = `${streetName} ∩ ${street.intersections[0]}`;
+      if (street.from) {
+        const intersection = `${streetName} ∩ ${street.from}`;
         console.log(`  Geocoding intersection: ${intersection}...`);
         try {
           const intersectionGeo = await overpassGeocodeAddresses([
@@ -172,20 +163,16 @@ async function main() {
   console.log("\n📍 Finding message with pins (addresses)...");
   const msgWithPins = recentMessages.docs.find((doc) => {
     const data = doc.data();
-    return (
-      data.extractedData?.pins &&
-      Array.isArray(data.extractedData.pins) &&
-      data.extractedData.pins.length > 0
-    );
+    return data.pins && Array.isArray(data.pins) && data.pins.length > 0;
   });
 
   if (msgWithPins) {
     const msg = msgWithPins.data();
     console.log(`  Found message: ${msgWithPins.id}`);
-    console.log(`  Pins: ${msg.extractedData?.pins?.length || 0}`);
+    console.log(`  Pins: ${msg.pins?.length || 0}`);
 
-    if (msg.extractedData?.pins && msg.extractedData.pins.length > 0) {
-      const pin = msg.extractedData.pins[0];
+    if (msg.pins && msg.pins.length > 0) {
+      const pin = msg.pins[0];
       const address = pin.address;
       console.log(`  Geocoding address: ${address}...`);
       try {

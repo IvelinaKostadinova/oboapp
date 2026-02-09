@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
-import { InternalMessage } from "@/lib/types";
-import { convertTimestamp } from "@/lib/firestore-utils";
+import {
+  InternalMessage,
+  GeoJSONFeatureCollection,
+  Address,
+  IngestError,
+} from "@/lib/types";
+import { convertTimestamp, safeJsonParse } from "@/lib/firestore-utils";
 import admin from "firebase-admin";
 
 const PAGE_SIZE = 12;
@@ -70,9 +75,18 @@ export async function GET(request: Request) {
           messages.push({
             id: doc.id,
             text: data.text,
+            plainText: data.plainText,
             markdownText: data.markdownText,
-            addresses: data.addresses ? JSON.parse(data.addresses) : [],
-            geoJson: data.geoJson ? JSON.parse(data.geoJson) : undefined,
+            addresses: data.addresses
+              ? safeJsonParse<Address[]>(data.addresses, [], "addresses")
+              : [],
+            geoJson: data.geoJson
+              ? safeJsonParse<GeoJSONFeatureCollection>(
+                  data.geoJson,
+                  undefined,
+                  "geoJson",
+                )
+              : undefined,
             crawledAt: data.crawledAt
               ? convertTimestamp(data.crawledAt)
               : undefined,
@@ -91,17 +105,23 @@ export async function GET(request: Request) {
               : undefined,
             cityWide: data.cityWide || false,
             responsibleEntity: data.responsibleEntity,
-            pins: data.pins,
-            streets: data.streets,
-            cadastralProperties: data.cadastralProperties,
-            busStops: data.busStops,
-            // Internal-only fields
-            extractedData: data.extractedData
-              ? JSON.parse(data.extractedData)
+            pins: Array.isArray(data.pins) ? data.pins : undefined,
+            streets: Array.isArray(data.streets) ? data.streets : undefined,
+            cadastralProperties: Array.isArray(data.cadastralProperties)
+              ? data.cadastralProperties
               : undefined,
+            busStops: Array.isArray(data.busStops) ? data.busStops : undefined,
+            // Internal-only fields
+            process: Array.isArray(data.process) ? data.process : undefined,
             ingestErrors: Array.isArray(data.ingestErrors)
               ? data.ingestErrors
-              : undefined,
+              : typeof data.ingestErrors === "string"
+                ? safeJsonParse<IngestError[]>(
+                    data.ingestErrors,
+                    undefined,
+                    "ingestErrors",
+                  )
+                : undefined,
           });
         }
       });

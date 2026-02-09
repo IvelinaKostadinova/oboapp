@@ -311,6 +311,21 @@ exports[`YSM OpenAPI > matches snapshot 1`] = `
                 "address": {
                   "type": "string",
                 },
+                "coordinates": {
+                  "properties": {
+                    "lat": {
+                      "type": "number",
+                    },
+                    "lng": {
+                      "type": "number",
+                    },
+                  },
+                  "required": [
+                    "lat",
+                    "lng",
+                  ],
+                  "type": "object",
+                },
                 "timespans": {
                   "items": {
                     "properties": {
@@ -338,6 +353,9 @@ exports[`YSM OpenAPI > matches snapshot 1`] = `
             },
             "type": "array",
           },
+          "plainText": {
+            "type": "string",
+          },
           "responsibleEntity": {
             "type": "string",
           },
@@ -352,6 +370,21 @@ exports[`YSM OpenAPI > matches snapshot 1`] = `
               "properties": {
                 "from": {
                   "type": "string",
+                },
+                "fromCoordinates": {
+                  "properties": {
+                    "lat": {
+                      "type": "number",
+                    },
+                    "lng": {
+                      "type": "number",
+                    },
+                  },
+                  "required": [
+                    "lat",
+                    "lng",
+                  ],
+                  "type": "object",
                 },
                 "street": {
                   "type": "string",
@@ -376,6 +409,21 @@ exports[`YSM OpenAPI > matches snapshot 1`] = `
                 },
                 "to": {
                   "type": "string",
+                },
+                "toCoordinates": {
+                  "properties": {
+                    "lat": {
+                      "type": "number",
+                    },
+                    "lng": {
+                      "type": "number",
+                    },
+                  },
+                  "required": [
+                    "lat",
+                    "lng",
+                  ],
+                  "type": "object",
                 },
               },
               "required": [
@@ -702,6 +750,21 @@ exports[`YSM OpenAPI > matches snapshot 1`] = `
                       "address": {
                         "type": "string",
                       },
+                      "coordinates": {
+                        "properties": {
+                          "lat": {
+                            "type": "number",
+                          },
+                          "lng": {
+                            "type": "number",
+                          },
+                        },
+                        "required": [
+                          "lat",
+                          "lng",
+                        ],
+                        "type": "object",
+                      },
                       "timespans": {
                         "items": {
                           "properties": {
@@ -729,6 +792,9 @@ exports[`YSM OpenAPI > matches snapshot 1`] = `
                   },
                   "type": "array",
                 },
+                "plainText": {
+                  "type": "string",
+                },
                 "responsibleEntity": {
                   "type": "string",
                 },
@@ -743,6 +809,21 @@ exports[`YSM OpenAPI > matches snapshot 1`] = `
                     "properties": {
                       "from": {
                         "type": "string",
+                      },
+                      "fromCoordinates": {
+                        "properties": {
+                          "lat": {
+                            "type": "number",
+                          },
+                          "lng": {
+                            "type": "number",
+                          },
+                        },
+                        "required": [
+                          "lat",
+                          "lng",
+                        ],
+                        "type": "object",
                       },
                       "street": {
                         "type": "string",
@@ -767,6 +848,21 @@ exports[`YSM OpenAPI > matches snapshot 1`] = `
                       },
                       "to": {
                         "type": "string",
+                      },
+                      "toCoordinates": {
+                        "properties": {
+                          "lat": {
+                            "type": "number",
+                          },
+                          "lng": {
+                            "type": "number",
+                          },
+                        },
+                        "required": [
+                          "lat",
+                          "lng",
+                        ],
+                        "type": "object",
                       },
                     },
                     "required": [
