@@ -8,6 +8,7 @@ import {
   IntersectionCoordinates,
 } from "./types";
 import { getStreetGeometry } from "./geocoding-router";
+import { roundCoordinate } from "@/lib/coordinate-utils";
 import { logger } from "@/lib/logger";
 
 // Constants for street buffer widths (in meters)
@@ -49,6 +50,7 @@ async function getStreetCenterline(
   startCoords: IntersectionCoordinates,
   endCoords: IntersectionCoordinates,
   streetName: string,
+  hasPreResolvedCoordinates: boolean = false,
 ): Promise<GeoJSONLineString> {
   // Check if start and end are the same or very close
   const distance = Math.sqrt(
@@ -66,6 +68,24 @@ async function getStreetCenterline(
       coordinates: [
         [startCoords.lng, startCoords.lat - offsetDegrees / 2],
         [startCoords.lng, startCoords.lat + offsetDegrees / 2],
+      ],
+    };
+  }
+
+  // If both endpoints have pre-resolved coordinates from the source,
+  // draw a straight line instead of querying Overpass for street geometry
+  if (hasPreResolvedCoordinates) {
+    logger.info(
+      "Using straight line for street with pre-resolved coordinates",
+      {
+        street: streetName,
+      },
+    );
+    return {
+      type: "LineString",
+      coordinates: [
+        [startCoords.lng, startCoords.lat],
+        [endCoords.lng, endCoords.lat],
       ],
     };
   }
@@ -200,11 +220,23 @@ async function createClosureFeature(
     );
   }
 
+  // Check if both endpoints have pre-resolved coordinates that were actually validated and used
+  // We compare the coordinates we're using with the rounded version of the original pre-resolved coordinates
+  // (since validation rounds to 6 decimal places)
+  const hasPreResolvedCoordinates =
+    !!street.fromCoordinates &&
+    !!street.toCoordinates &&
+    roundCoordinate(street.fromCoordinates.lat) === startCoords.lat &&
+    roundCoordinate(street.fromCoordinates.lng) === startCoords.lng &&
+    roundCoordinate(street.toCoordinates.lat) === endCoords.lat &&
+    roundCoordinate(street.toCoordinates.lng) === endCoords.lng;
+
   // Get centerline
   const centerline = await getStreetCenterline(
     startCoords,
     endCoords,
     street.street,
+    hasPreResolvedCoordinates,
   );
 
   // Convert to polygon
@@ -257,7 +289,9 @@ export async function convertToGeoJSON(
       const endCoords = preGeocodedAddresses.get(street.to);
 
       if (startCoords && endCoords) {
-        logger.info("Converting street to 2 fallback pins (both endpoints have coordinates)");
+        logger.info(
+          "Converting street to 2 fallback pins (both endpoints have coordinates)",
+        );
 
         // Create two pins from the street endpoints
         fallbackPins.push(
@@ -271,7 +305,10 @@ export async function convertToGeoJSON(
           },
         );
       } else {
-        logger.error("Cannot create fallback pins (missing coordinates)", { hasFrom: !!startCoords, hasTo: !!endCoords });
+        logger.error("Cannot create fallback pins (missing coordinates)", {
+          hasFrom: !!startCoords,
+          hasTo: !!endCoords,
+        });
       }
     }
   }
@@ -283,7 +320,10 @@ export async function convertToGeoJSON(
       const feature = createPinFeature(pin, preGeocodedAddresses);
       features.push(feature);
     } catch (error) {
-      logger.error("Failed to create pin", { address: pin.address, error: error instanceof Error ? error.message : String(error) });
+      logger.error("Failed to create pin", {
+        address: pin.address,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 

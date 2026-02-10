@@ -2,12 +2,29 @@ import { describe, it, expect, vi } from "vitest";
 import {
   findMissingStreetEndpoints,
   deduplicateAddresses,
+  geocodeAddressesFromExtractedData,
+  getValidPreResolvedCoordinates,
 } from "./geocode-addresses";
-import type { StreetSection, Address } from "@/lib/types";
+import type { StreetSection, Address, ExtractedLocations } from "@/lib/types";
+import { SOFIA_BOUNDS } from "@/lib/bounds";
 
 // Mock firebase-admin to avoid requiring env vars
 vi.mock("@/lib/firebase-admin", () => ({
   adminDb: vi.fn(),
+}));
+
+// Mock geocoding services
+vi.mock("@/lib/geocoding-router", () => ({
+  geocodeAddresses: vi.fn().mockResolvedValue([]),
+  geocodeIntersectionsForStreets: vi.fn().mockResolvedValue(new Map()),
+  geocodeCadastralPropertiesFromIdentifiers: vi
+    .fn()
+    .mockResolvedValue(new Map()),
+  geocodeBusStops: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock("@/lib/overpass-geocoding-service", () => ({
+  overpassGeocodeAddresses: vi.fn().mockResolvedValue([]),
 }));
 
 describe(findMissingStreetEndpoints, () => {
@@ -136,11 +153,7 @@ describe(findMissingStreetEndpoints, () => {
 });
 
 // Helper to create test addresses
-function createAddress(
-  text: string,
-  lat: number,
-  lng: number,
-): Address {
+function createAddress(text: string, lat: number, lng: number): Address {
   return {
     originalText: text,
     formattedAddress: text,
@@ -214,5 +227,190 @@ describe(deduplicateAddresses, () => {
     ];
     const result = deduplicateAddresses(addresses);
     expect(result).toHaveLength(1);
+  });
+});
+
+describe("geocodeAddressesFromExtractedData", () => {
+  it("should skip geocoding for pins with pre-resolved coordinates", async () => {
+    const extractedData: ExtractedLocations = {
+      withSpecificAddress: true,
+      cityWide: false,
+      busStops: [],
+      pins: [
+        {
+          address: "ул. Георги Бенковски №26",
+          coordinates: { lat: 42.6993633, lng: 23.328635 },
+          timespans: [{ start: "07.02.2026 08:00", end: "07.02.2026 18:00" }],
+        },
+      ],
+      streets: [],
+      cadastralProperties: [],
+    };
+
+    const result = await geocodeAddressesFromExtractedData(extractedData);
+
+    // Should have the pre-resolved coordinates in the map (rounded to 6 decimals)
+    expect(result.preGeocodedMap.has("ул. Георги Бенковски №26")).toBe(true);
+    expect(result.preGeocodedMap.get("ул. Георги Бенковски №26")).toEqual({
+      lat: 42.699363,
+      lng: 23.328635,
+    });
+
+    // Should have created an address with the rounded coordinates
+    expect(result.addresses).toHaveLength(1);
+    expect(result.addresses[0].originalText).toBe("ул. Георги Бенковски №26");
+    expect(result.addresses[0].coordinates).toEqual({
+      lat: 42.699363,
+      lng: 23.328635,
+    });
+  });
+
+  it("should skip geocoding for street endpoints with pre-resolved coordinates", async () => {
+    const extractedData: ExtractedLocations = {
+      withSpecificAddress: true,
+      cityWide: false,
+      busStops: [],
+      pins: [],
+      streets: [
+        {
+          street: "ул. Оборище",
+          from: "Start Point",
+          fromCoordinates: { lat: 42.693576, lng: 23.35161 },
+          to: "End Point",
+          toCoordinates: { lat: 42.693259, lng: 23.3549725 },
+          timespans: [{ start: "05.02.2026 00:00", end: "09.03.2026 23:59" }],
+        },
+      ],
+      cadastralProperties: [],
+    };
+
+    const result = await geocodeAddressesFromExtractedData(extractedData);
+
+    // Should have both endpoints in the pre-geocoded map (rounded to 6 decimals)
+    expect(result.preGeocodedMap.has("Start Point")).toBe(true);
+    expect(result.preGeocodedMap.has("End Point")).toBe(true);
+    expect(result.preGeocodedMap.get("Start Point")).toEqual({
+      lat: 42.693576,
+      lng: 23.35161,
+    });
+    expect(result.preGeocodedMap.get("End Point")).toEqual({
+      lat: 42.693259,
+      lng: 23.354973,
+    });
+
+    // Should have created addresses for both endpoints
+    expect(result.addresses.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("should mix pre-resolved coordinates with geocoded addresses", async () => {
+    // Import the mocked functions to verify they're not called for pre-resolved
+    const { geocodeAddresses } = await import("@/lib/geocoding-router");
+
+    const extractedData: ExtractedLocations = {
+      withSpecificAddress: true,
+      cityWide: false,
+      busStops: [],
+      pins: [
+        {
+          address: "With coordinates",
+          coordinates: { lat: 42.69, lng: 23.32 },
+          timespans: [{ start: "01.02.2026 00:00", end: "02.02.2026 00:00" }],
+        },
+        {
+          address: "Without coordinates",
+          timespans: [{ start: "01.02.2026 00:00", end: "02.02.2026 00:00" }],
+        },
+      ],
+      streets: [],
+      cadastralProperties: [],
+    };
+
+    const result = await geocodeAddressesFromExtractedData(extractedData);
+
+    // Should have pre-resolved coordinate in the map
+    expect(result.preGeocodedMap.has("With coordinates")).toBe(true);
+
+    // geocodeAddresses should be called only for the pin without coordinates
+    expect(geocodeAddresses).toHaveBeenCalledWith(["Without coordinates"]);
+  });
+});
+
+describe("getValidPreResolvedCoordinates", () => {
+  it("should round coordinates to 6 decimal places", () => {
+    const coords = { lat: 42.69936334567, lng: 23.32863534567 };
+    const result = getValidPreResolvedCoordinates(coords, "test");
+
+    expect(result).not.toBeNull();
+    expect(result!.lat).toBe(42.699363);
+    expect(result!.lng).toBe(23.328635);
+  });
+
+  it("should accept valid Sofia coordinates", () => {
+    const coords = { lat: 42.6993633, lng: 23.328635 };
+    const result = getValidPreResolvedCoordinates(coords, "test");
+
+    expect(result).not.toBeNull();
+    expect(result!.lat).toBe(42.699363);
+    expect(result!.lng).toBe(23.328635);
+  });
+
+  it("should reject coordinates outside Sofia bounds (north)", () => {
+    const coords = { lat: 43.0, lng: 23.3 }; // Too far north
+    const result = getValidPreResolvedCoordinates(coords, "test");
+
+    expect(result).toBeNull();
+  });
+
+  it("should reject coordinates outside Sofia bounds (south)", () => {
+    const coords = { lat: 42.5, lng: 23.3 }; // Too far south
+    const result = getValidPreResolvedCoordinates(coords, "test");
+
+    expect(result).toBeNull();
+  });
+
+  it("should reject coordinates outside Sofia bounds (east)", () => {
+    const coords = { lat: 42.7, lng: 23.6 }; // Too far east
+    const result = getValidPreResolvedCoordinates(coords, "test");
+
+    expect(result).toBeNull();
+  });
+
+  it("should reject coordinates outside Sofia bounds (west)", () => {
+    const coords = { lat: 42.7, lng: 23.1 }; // Too far west
+    const result = getValidPreResolvedCoordinates(coords, "test");
+
+    expect(result).toBeNull();
+  });
+
+  it("should handle coordinates at Sofia boundary edges", () => {
+    // Test at SOFIA_BOUNDS edges (see @/lib/bounds for actual values)
+    const coordsNorth = { lat: SOFIA_BOUNDS.north, lng: 23.3 };
+    const coordsSouth = { lat: SOFIA_BOUNDS.south, lng: 23.3 };
+    const coordsEast = { lat: 42.7, lng: SOFIA_BOUNDS.east };
+    const coordsWest = { lat: 42.7, lng: SOFIA_BOUNDS.west };
+
+    expect(getValidPreResolvedCoordinates(coordsNorth, "test")).not.toBeNull();
+    expect(getValidPreResolvedCoordinates(coordsSouth, "test")).not.toBeNull();
+    expect(getValidPreResolvedCoordinates(coordsEast, "test")).not.toBeNull();
+    expect(getValidPreResolvedCoordinates(coordsWest, "test")).not.toBeNull();
+  });
+
+  it("should handle coordinates with excessive precision", () => {
+    // Micron-level precision (9 decimal places ~0.11mm)
+    const coords = { lat: 42.123456789, lng: 23.987654321 };
+    const result = getValidPreResolvedCoordinates(coords, "test");
+
+    // Should round but reject if outside bounds
+    expect(result).toBeNull(); // These coords are outside Sofia
+  });
+
+  it("should round coordinates near street section example from issue", () => {
+    // Example from issue: 42.693576, 23.35161
+    const coords = { lat: 42.693576, lng: 23.35161 };
+    const result = getValidPreResolvedCoordinates(coords, "test");
+
+    expect(result).not.toBeNull();
+    expect(result!.lat).toBe(42.693576);
+    expect(result!.lng).toBe(23.35161);
   });
 });

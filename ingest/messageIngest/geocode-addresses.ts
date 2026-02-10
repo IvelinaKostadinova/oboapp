@@ -13,12 +13,44 @@ import {
 } from "@/lib/types";
 import type { CadastralGeometry } from "@/lib/cadastre-geocoding-service";
 import { logger } from "@/lib/logger";
+import { isWithinSofia } from "@/lib/bounds";
+import { roundCoordinate } from "@/lib/coordinate-utils";
 
 // Internal types for the geocoding pipeline
 export interface GeocodingResult {
   preGeocodedMap: Map<string, Coordinates>;
   addresses: Address[];
   cadastralGeometries?: Map<string, CadastralGeometry>;
+}
+
+/**
+ * Validate and normalize pre-resolved coordinates from source
+ * - Rounds to 6 decimal places (precision ~0.1 meters)
+ * - Validates coordinates are within Sofia bounds
+ * Returns null if coordinates are invalid
+ * Exported for unit testing
+ */
+export function getValidPreResolvedCoordinates(
+  coordinates: Coordinates,
+  context: string,
+): Coordinates | null {
+  // Round to 6 decimal places (precision ~0.1 meters at Sofia's latitude)
+  const rounded: Coordinates = {
+    lat: roundCoordinate(coordinates.lat),
+    lng: roundCoordinate(coordinates.lng),
+  };
+
+  // Validate coordinates are within Sofia bounds
+  if (!isWithinSofia(rounded.lat, rounded.lng)) {
+    logger.warn("Pre-resolved coordinates outside Sofia bounds", {
+      context,
+      original: coordinates,
+      rounded,
+    });
+    return null;
+  }
+
+  return rounded;
 }
 
 /**
@@ -105,6 +137,261 @@ export function findMissingStreetEndpoints(
 }
 
 /**
+ * Helper: Create an Address object from validated coordinates
+ * Exported for unit testing
+ */
+export function createAddressFromCoordinates(
+  text: string,
+  coordinates: Coordinates,
+): Address {
+  return {
+    originalText: text,
+    formattedAddress: text,
+    coordinates,
+    geoJson: {
+      type: "Point",
+      coordinates: [coordinates.lng, coordinates.lat],
+    },
+  };
+}
+
+/**
+ * Helper: Process pins with pre-resolved coordinates
+ * Returns addresses that need geocoding and adds validated coordinates to the map
+ */
+function processPinsWithPreResolvedCoordinates(
+  pins: Array<{
+    address: string;
+    coordinates?: Coordinates;
+    timespans: Array<{ start: string; end: string }>;
+  }>,
+  preGeocodedMap: Map<string, Coordinates>,
+  addresses: Address[],
+): string[] {
+  const pinsToGeocode: string[] = [];
+
+  for (const pin of pins) {
+    if (pin.coordinates) {
+      const validatedCoords = getValidPreResolvedCoordinates(
+        pin.coordinates,
+        `pin: ${pin.address}`,
+      );
+
+      if (validatedCoords) {
+        preGeocodedMap.set(pin.address, validatedCoords);
+        addresses.push(
+          createAddressFromCoordinates(pin.address, validatedCoords),
+        );
+      } else {
+        logger.warn("Invalid pre-resolved coordinates for pin, will geocode", {
+          address: pin.address,
+          coordinates: pin.coordinates,
+        });
+        pinsToGeocode.push(pin.address);
+      }
+    } else {
+      pinsToGeocode.push(pin.address);
+    }
+  }
+
+  return pinsToGeocode;
+}
+
+/**
+ * Helper: Geocode pins using Google API
+ */
+async function geocodePins(
+  extractedData: ExtractedLocations,
+  preGeocodedMap: Map<string, Coordinates>,
+  addresses: Address[],
+): Promise<void> {
+  if (extractedData.pins.length === 0) return;
+
+  const pinsToGeocode = processPinsWithPreResolvedCoordinates(
+    extractedData.pins,
+    preGeocodedMap,
+    addresses,
+  );
+
+  if (pinsToGeocode.length > 0) {
+    const geocodedPins = await geocodeAddresses(pinsToGeocode);
+    addresses.push(...geocodedPins);
+
+    geocodedPins.forEach((addr) => {
+      preGeocodedMap.set(addr.originalText, addr.coordinates);
+    });
+  }
+}
+
+/**
+ * Helper: Process a single street endpoint with pre-resolved coordinates
+ */
+function processStreetEndpoint(
+  street: StreetSection,
+  endpointName: string,
+  endpointCoordinates: Coordinates,
+  direction: "from" | "to",
+  preGeocodedMap: Map<string, Coordinates>,
+  addresses: Address[],
+): void {
+  const validatedCoords = getValidPreResolvedCoordinates(
+    endpointCoordinates,
+    `street endpoint: ${street.street} ${direction} ${endpointName}`,
+  );
+
+  if (validatedCoords) {
+    preGeocodedMap.set(endpointName, validatedCoords);
+    addresses.push(createAddressFromCoordinates(endpointName, validatedCoords));
+  } else {
+    logger.warn(
+      "Invalid pre-resolved coordinates for street endpoint, will geocode",
+      {
+        street: street.street,
+        endpoint: endpointName,
+        coordinates: endpointCoordinates,
+      },
+    );
+  }
+}
+
+/**
+ * Helper: Process street endpoints with pre-resolved coordinates
+ */
+function processStreetEndpointsWithPreResolvedCoordinates(
+  streets: StreetSection[],
+  preGeocodedMap: Map<string, Coordinates>,
+  addresses: Address[],
+): void {
+  for (const street of streets) {
+    if (street.fromCoordinates) {
+      processStreetEndpoint(
+        street,
+        street.from,
+        street.fromCoordinates,
+        "from",
+        preGeocodedMap,
+        addresses,
+      );
+    }
+
+    if (street.toCoordinates) {
+      processStreetEndpoint(
+        street,
+        street.to,
+        street.toCoordinates,
+        "to",
+        preGeocodedMap,
+        addresses,
+      );
+    }
+  }
+}
+
+/**
+ * Helper: Geocode street intersections using Overpass
+ */
+async function geocodeStreetIntersections(
+  extractedData: ExtractedLocations,
+  preGeocodedMap: Map<string, Coordinates>,
+  addresses: Address[],
+): Promise<void> {
+  if (extractedData.streets.length === 0) return;
+
+  // Process pre-resolved coordinates first
+  processStreetEndpointsWithPreResolvedCoordinates(
+    extractedData.streets,
+    preGeocodedMap,
+    addresses,
+  );
+
+  // Filter to streets that still need Overpass geocoding
+  const streetsNeedingGeocoding = extractedData.streets.filter(
+    (street) =>
+      !preGeocodedMap.has(street.from) || !preGeocodedMap.has(street.to),
+  );
+
+  if (streetsNeedingGeocoding.length > 0) {
+    const streetGeocodedMap = await geocodeIntersectionsForStreets(
+      streetsNeedingGeocoding,
+      preGeocodedMap,
+    );
+
+    streetGeocodedMap.forEach((coords, key) => {
+      if (!preGeocodedMap.has(key)) {
+        preGeocodedMap.set(key, coords);
+        addresses.push(createAddressFromCoordinates(key, coords));
+      }
+    });
+  }
+
+  // Fallback geocoding for missing endpoints
+  const missingEndpoints = findMissingStreetEndpoints(
+    extractedData.streets,
+    preGeocodedMap,
+  );
+
+  if (missingEndpoints.length > 0) {
+    const fallbackGeocoded = await overpassGeocodeAddresses(missingEndpoints);
+    fallbackGeocoded.forEach((addr) => {
+      preGeocodedMap.set(addr.originalText, addr.coordinates);
+      addresses.push(addr);
+    });
+  }
+}
+
+/**
+ * Helper: Geocode cadastral properties using Bulgarian Cadastre API
+ */
+async function geocodeCadastralProperties(
+  extractedData: ExtractedLocations,
+): Promise<Map<string, CadastralGeometry> | undefined> {
+  if (
+    !extractedData.cadastralProperties ||
+    extractedData.cadastralProperties.length === 0
+  ) {
+    return undefined;
+  }
+
+  const identifiers = extractedData.cadastralProperties.map(
+    (prop) => prop.identifier,
+  );
+  const cadastralGeometries =
+    await geocodeCadastralPropertiesFromIdentifiers(identifiers);
+
+  logger.info("Geocoded cadastral properties", {
+    geocoded: cadastralGeometries.size,
+    total: identifiers.length,
+  });
+
+  return cadastralGeometries;
+}
+
+/**
+ * Helper: Geocode bus stops using GTFS data
+ */
+async function geocodeBusStopsFromExtractedData(
+  extractedData: ExtractedLocations,
+  preGeocodedMap: Map<string, Coordinates>,
+  addresses: Address[],
+): Promise<void> {
+  if (!extractedData.busStops || extractedData.busStops.length === 0) {
+    return;
+  }
+
+  const geocodedBusStops = await geocodeBusStops(extractedData.busStops);
+  addresses.push(...geocodedBusStops);
+
+  geocodedBusStops.forEach((addr) => {
+    preGeocodedMap.set(addr.originalText, addr.coordinates);
+  });
+
+  logger.info("Geocoded bus stops", {
+    geocoded: geocodedBusStops.length,
+    total: extractedData.busStops.length,
+  });
+}
+
+/**
  * Geocode addresses from extracted locations using hybrid approach.
  * Google for pins, Overpass for street intersections, Cadastre for УПИ, GTFS for bus stops.
  * Skips geocoding for locations with pre-resolved coordinates from the AI.
@@ -114,154 +401,20 @@ export async function geocodeAddressesFromExtractedData(
 ): Promise<GeocodingResult> {
   const preGeocodedMap = new Map<string, Coordinates>();
   const addresses: Address[] = [];
-  let cadastralGeometries: Map<string, CadastralGeometry> | undefined;
 
   if (!extractedData) {
     return { preGeocodedMap, addresses };
   }
 
-  // Geocode pins using Google (skip pins with pre-resolved coordinates)
-  if (extractedData.pins.length > 0) {
-    const pinsToGeocode: string[] = [];
-
-    for (const pin of extractedData.pins) {
-      if (pin.coordinates) {
-        // Pre-resolved coordinates from AI — skip Google geocoding
-        preGeocodedMap.set(pin.address, pin.coordinates);
-        addresses.push({
-          originalText: pin.address,
-          formattedAddress: pin.address,
-          coordinates: pin.coordinates,
-          geoJson: {
-            type: "Point",
-            coordinates: [pin.coordinates.lng, pin.coordinates.lat],
-          },
-        });
-      } else {
-        pinsToGeocode.push(pin.address);
-      }
-    }
-
-    if (pinsToGeocode.length > 0) {
-      const geocodedPins = await geocodeAddresses(pinsToGeocode);
-      addresses.push(...geocodedPins);
-
-      geocodedPins.forEach((addr) => {
-        preGeocodedMap.set(addr.originalText, addr.coordinates);
-      });
-    }
-  }
-
-  // Geocode street intersections using Overpass (skip endpoints with pre-resolved coordinates)
-  if (extractedData.streets.length > 0) {
-    // First, add any pre-resolved endpoint coordinates
-    for (const street of extractedData.streets) {
-      if (street.fromCoordinates) {
-        preGeocodedMap.set(street.from, street.fromCoordinates);
-        addresses.push({
-          originalText: street.from,
-          formattedAddress: street.from,
-          coordinates: street.fromCoordinates,
-          geoJson: {
-            type: "Point",
-            coordinates: [
-              street.fromCoordinates.lng,
-              street.fromCoordinates.lat,
-            ],
-          },
-        });
-      }
-      if (street.toCoordinates) {
-        preGeocodedMap.set(street.to, street.toCoordinates);
-        addresses.push({
-          originalText: street.to,
-          formattedAddress: street.to,
-          coordinates: street.toCoordinates,
-          geoJson: {
-            type: "Point",
-            coordinates: [street.toCoordinates.lng, street.toCoordinates.lat],
-          },
-        });
-      }
-    }
-
-    // Filter to streets that still need Overpass geocoding (at least one endpoint missing)
-    const streetsNeedingGeocoding = extractedData.streets.filter(
-      (street) =>
-        !preGeocodedMap.has(street.from) || !preGeocodedMap.has(street.to),
-    );
-
-    if (streetsNeedingGeocoding.length > 0) {
-      const streetGeocodedMap = await geocodeIntersectionsForStreets(
-        streetsNeedingGeocoding,
-        preGeocodedMap, // Pass the map to skip already geocoded endpoints
-      );
-
-      // Merge into preGeocodedMap and create Address objects
-      streetGeocodedMap.forEach((coords, key) => {
-        if (!preGeocodedMap.has(key)) {
-          preGeocodedMap.set(key, coords);
-          addresses.push({
-            originalText: key,
-            formattedAddress: key,
-            coordinates: coords,
-            geoJson: {
-              type: "Point",
-              coordinates: [coords.lng, coords.lat],
-            },
-          });
-        }
-      });
-    }
-
-    // Check for missing endpoints and try fallback geocoding
-    const missingEndpoints = findMissingStreetEndpoints(
-      extractedData.streets,
-      preGeocodedMap,
-    );
-
-    if (missingEndpoints.length > 0) {
-      // Use Overpass/Nominatim for street endpoints (handles house numbers via Nominatim)
-      const fallbackGeocoded = await overpassGeocodeAddresses(missingEndpoints);
-
-      fallbackGeocoded.forEach((addr) => {
-        preGeocodedMap.set(addr.originalText, addr.coordinates);
-        addresses.push(addr);
-      });
-    }
-  }
-
-  // Geocode cadastral properties using Bulgarian Cadastre API
-  if (
-    extractedData.cadastralProperties &&
-    extractedData.cadastralProperties.length > 0
-  ) {
-    const identifiers = extractedData.cadastralProperties.map(
-      (prop) => prop.identifier,
-    );
-    cadastralGeometries =
-      await geocodeCadastralPropertiesFromIdentifiers(identifiers);
-
-    logger.info("Geocoded cadastral properties", {
-      geocoded: cadastralGeometries.size,
-      total: identifiers.length,
-    });
-  }
-
-  // Geocode bus stops using GTFS (from ExtractedLocations directly)
-  if (extractedData.busStops && extractedData.busStops.length > 0) {
-    const geocodedBusStops = await geocodeBusStops(extractedData.busStops);
-    addresses.push(...geocodedBusStops);
-
-    geocodedBusStops.forEach((addr) => {
-      preGeocodedMap.set(addr.originalText, addr.coordinates);
-    });
-
-    logger.info("Geocoded bus stops", {
-      geocoded: geocodedBusStops.length,
-      total: extractedData.busStops.length,
-    });
-  }
+  // Geocode each location type using specialized services
+  await geocodePins(extractedData, preGeocodedMap, addresses);
+  await geocodeStreetIntersections(extractedData, preGeocodedMap, addresses);
+  const cadastralGeometries = await geocodeCadastralProperties(extractedData);
+  await geocodeBusStopsFromExtractedData(
+    extractedData,
+    preGeocodedMap,
+    addresses,
+  );
 
   // Deduplicate addresses before returning
   const deduplicatedAddresses = deduplicateAddresses(addresses);
