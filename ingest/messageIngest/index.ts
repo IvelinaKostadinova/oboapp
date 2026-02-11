@@ -24,7 +24,8 @@ export {
 export { convertMessageGeocodingToGeoJson } from "./convert-to-geojson";
 export { filterOutlierCoordinates } from "./filter-outliers";
 export { verifyAuthToken, validateMessageText } from "./helpers";
-export { buildMessageResponse } from "./build-response";
+import { buildMessageResponse } from "./build-response";
+export { buildMessageResponse };
 
 export interface MessageIngestOptions {
   /**
@@ -164,7 +165,7 @@ async function processSingleMessage(
 
     // Early exit: Geocoding failed
     if (!geocodingResult) {
-      return await buildFinalMessageResponse(
+      return await buildMessageResponse(
         messageId,
         text,
         options.locality,
@@ -185,7 +186,7 @@ async function processSingleMessage(
 
   await finalizeMessageWithResults(messageId, geoJson, ingestErrors);
 
-  return await buildFinalMessageResponse(
+  return await buildMessageResponse(
     messageId,
     text,
     options.locality,
@@ -363,7 +364,7 @@ async function processWithAIPipeline(
         finalizedAt: new Date(),
         ...buildIngestErrorsField(ingestErrors),
       });
-      const message = await buildFinalMessageResponse(
+      const message = await buildMessageResponse(
         storedMessageId,
         messageText,
         options.locality,
@@ -387,7 +388,7 @@ async function processWithAIPipeline(
         finalizedAt: new Date(),
         ...buildIngestErrorsField(ingestErrors),
       });
-      const message = await buildFinalMessageResponse(
+      const message = await buildMessageResponse(
         storedMessageId,
         messageText,
         options.locality,
@@ -591,7 +592,6 @@ async function handleIrrelevantMessage(
     ...buildIngestErrorsField(ingestErrors),
   });
 
-  const { buildMessageResponse } = await import("./build-response");
   return await buildMessageResponse(messageId, text, locality, [], null);
 }
 
@@ -734,7 +734,6 @@ async function finalizeFailedMessage(
     ...buildIngestErrorsField(ingestErrors),
   });
 
-  const { buildMessageResponse } = await import("./build-response");
   return await buildMessageResponse(messageId, text, locality, [], null);
 }
 
@@ -819,24 +818,4 @@ async function finalizeMessageWithoutGeoJson(
     finalizedAt: new Date(),
     ...buildIngestErrorsField(ingestErrors),
   });
-}
-
-/**
- * Build the final message response
- */
-async function buildFinalMessageResponse(
-  messageId: string,
-  text: string,
-  locality: string,
-  addresses: Address[],
-  geoJson: GeoJSONFeatureCollection | null,
-): Promise<InternalMessage> {
-  const { buildMessageResponse } = await import("./build-response");
-  return await buildMessageResponse(
-    messageId,
-    text,
-    locality,
-    addresses,
-    geoJson,
-  );
 }
