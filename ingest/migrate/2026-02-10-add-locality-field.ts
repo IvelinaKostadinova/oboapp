@@ -12,7 +12,7 @@ import { resolve } from "node:path";
 dotenv.config({ path: resolve(process.cwd(), ".env.local") });
 
 async function main() {
-  const { adminDb } = await import("../ingest/lib/firebase-admin");
+  const { adminDb } = await import("../lib/firebase-admin");
 
   console.log("Starting migration to add locality field...");
 
@@ -29,7 +29,7 @@ async function main() {
 
   for (const doc of sourcesSnapshot.docs) {
     const data = doc.data();
-    
+
     // Skip if locality already exists
     if (data.locality) {
       sourcesSkipped++;
@@ -45,7 +45,9 @@ async function main() {
     }
   }
 
-  console.log(`✓ Sources migration complete: ${sourcesUpdated} updated, ${sourcesSkipped} skipped`);
+  console.log(
+    `✓ Sources migration complete: ${sourcesUpdated} updated, ${sourcesSkipped} skipped`,
+  );
 
   // Migrate messages collection
   console.log("\n2. Migrating messages collection...");
@@ -57,7 +59,7 @@ async function main() {
 
   for (const doc of messagesSnapshot.docs) {
     const data = doc.data();
-    
+
     // Skip if locality already exists
     if (data.locality) {
       messagesSkipped++;
@@ -73,7 +75,9 @@ async function main() {
     }
   }
 
-  console.log(`✓ Messages migration complete: ${messagesUpdated} updated, ${messagesSkipped} skipped`);
+  console.log(
+    `✓ Messages migration complete: ${messagesUpdated} updated, ${messagesSkipped} skipped`,
+  );
 
   console.log("\n✓ Migration completed successfully!");
   console.log(`  Total sources updated: ${sourcesUpdated}`);
