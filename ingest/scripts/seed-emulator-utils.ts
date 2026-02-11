@@ -149,7 +149,7 @@ export function generateTimespan(index: number): Timespan {
 // Generate LineString with random nearby points
 export function generateLineStringPoints(numPoints: number): readonly Point[] {
   const points: Point[] = [];
-  const startPoint = randomSofiaPoint();
+  const startPoint = randomLocalityPoint();
   points.push(startPoint);
 
   for (let i = 1; i < numPoints; i++) {
