@@ -341,6 +341,11 @@ resource "google_cloud_run_v2_job" "crawlers" {
           name  = "NEXT_PUBLIC_APP_URL"
           value = "https://oboapp.online"
         }
+        
+        env {
+          name  = "LOCALITY"
+          value = var.locality
+        }
       }
       
       max_retries = 1
@@ -433,6 +438,11 @@ resource "google_cloud_run_v2_job" "ingest" {
           name  = "NEXT_PUBLIC_APP_URL"
           value = "https://oboapp.online"
         }
+        
+        env {
+          name  = "LOCALITY"
+          value = var.locality
+        }
       }
       
       max_retries = 1
@@ -524,6 +534,11 @@ resource "google_cloud_run_v2_job" "notify" {
         env {
           name  = "NEXT_PUBLIC_APP_URL"
           value = "https://oboapp.online"
+        }
+        
+        env {
+          name  = "LOCALITY"
+          value = var.locality
         }
       }
       
@@ -619,6 +634,11 @@ resource "google_cloud_run_v2_job" "pipeline_emergent" {
           name  = "NEXT_PUBLIC_APP_URL"
           value = "https://oboapp.online"
         }
+        
+        env {
+          name  = "LOCALITY"
+          value = var.locality
+        }
       }
       
       max_retries = 1
@@ -710,6 +730,11 @@ resource "google_cloud_run_v2_job" "pipeline_all" {
         env {
           name  = "NEXT_PUBLIC_APP_URL"
           value = "https://oboapp.online"
+        }
+        
+        env {
+          name  = "LOCALITY"
+          value = var.locality
         }
       }
       
@@ -824,6 +849,11 @@ resource "google_cloud_run_v2_job" "gtfs_sync" {
         env {
           name  = "NEXT_PUBLIC_FIREBASE_PROJECT_ID"
           value = var.firebase_project_id
+        }
+        
+        env {
+          name  = "LOCALITY"
+          value = var.locality
         }
       }
       

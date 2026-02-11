@@ -56,3 +56,9 @@ variable "alert_email" {
   description = "Email address for pipeline failure alerts"
   type        = string
 }
+
+variable "locality" {
+  description = "Locality identifier for messages (e.g., bg.sofia)"
+  type        = string
+  default     = "bg.sofia"
+}
