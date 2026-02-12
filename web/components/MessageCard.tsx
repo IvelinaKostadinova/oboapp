@@ -125,6 +125,8 @@ export default function MessageCard({
       onClick={handleClick}
       onMouseEnter={() => message.id && onHover?.(message.id)}
       onMouseLeave={() => onHover?.(null)}
+      onFocus={() => message.id && onHover?.(message.id)}
+      onBlur={() => onHover?.(null)}
     >
       {/* Status indicator circle (top-right) */}
       <div
