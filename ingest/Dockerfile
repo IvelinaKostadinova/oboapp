@@ -74,6 +74,7 @@ COPY --from=builder /app/ingest/dist ./ingest/dist
 COPY --from=builder /app/ingest/package*.json ./ingest/
 COPY --from=builder /app/ingest/prompts ./ingest/prompts
 COPY --from=builder /app/ingest/crawlers ./ingest/crawlers
+COPY --from=builder /app/ingest/localities ./ingest/localities
 
 ENV NODE_ENV=production
 ENV PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright
