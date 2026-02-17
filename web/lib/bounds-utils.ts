@@ -1,17 +1,41 @@
 /**
- * Geographic bounds and viewport utilities for Sofia, Bulgaria
+ * Geographic bounds and viewport utilities
  */
 
 import * as turf from "@turf/turf";
 import type { GeoJSONFeature } from "@/lib/types";
+import { BOUNDS, getBoundsForLocality, getCenterForLocality } from "@oboapp/shared";
 
-// Sofia bounding box (matches ingest/lib/geocoding-utils.ts)
-export const SOFIA_BOUNDS = {
-  south: 42.605,
-  west: 23.188,
-  north: 42.83,
-  east: 23.528,
-};
+/**
+ * Get locality from environment variable
+ * @throws Error if NEXT_PUBLIC_LOCALITY is not set
+ */
+function getLocality(): string {
+  const locality = process.env.NEXT_PUBLIC_LOCALITY;
+  if (!locality) {
+    throw new Error("NEXT_PUBLIC_LOCALITY environment variable is required but not set");
+  }
+  return locality;
+}
+
+/**
+ * Get bounds for the configured locality
+ */
+export function getLocalityBounds() {
+  const locality = getLocality();
+  return getBoundsForLocality(locality);
+}
+
+/**
+ * Get center for the configured locality
+ */
+export function getLocalityCenter() {
+  const locality = getLocality();
+  return getCenterForLocality(locality);
+}
+
+// Re-export BOUNDS for tests
+export { BOUNDS };
 
 export interface ViewportBounds {
   north: number;
@@ -22,14 +46,15 @@ export interface ViewportBounds {
 }
 
 /**
- * Clamp viewport bounds to Sofia city boundaries
+ * Clamp viewport bounds to locality boundaries
  */
 export function clampBounds(bounds: ViewportBounds): ViewportBounds {
+  const localityBounds = getLocalityBounds();
   return {
-    north: Math.min(bounds.north, SOFIA_BOUNDS.north),
-    south: Math.max(bounds.south, SOFIA_BOUNDS.south),
-    east: Math.min(bounds.east, SOFIA_BOUNDS.east),
-    west: Math.max(bounds.west, SOFIA_BOUNDS.west),
+    north: Math.min(bounds.north, localityBounds.north),
+    south: Math.max(bounds.south, localityBounds.south),
+    east: Math.min(bounds.east, localityBounds.east),
+    west: Math.max(bounds.west, localityBounds.west),
   };
 }
 
@@ -37,20 +62,21 @@ export function clampBounds(bounds: ViewportBounds): ViewportBounds {
  * Add percentage-based buffer to viewport bounds
  * @param bounds - Original viewport bounds
  * @param bufferPercent - Buffer percentage (e.g., 0.2 for 20%)
- * @returns Buffered bounds clamped to Sofia boundaries
+ * @returns Buffered bounds clamped to locality boundaries
  */
 export function addBuffer(
   bounds: ViewportBounds,
   bufferPercent: number = 0.2,
 ): ViewportBounds {
+  const localityBounds = getLocalityBounds();
   const latBuffer = (bounds.north - bounds.south) * bufferPercent;
   const lngBuffer = (bounds.east - bounds.west) * bufferPercent;
 
   return {
-    north: Math.min(bounds.north + latBuffer, SOFIA_BOUNDS.north),
-    south: Math.max(bounds.south - latBuffer, SOFIA_BOUNDS.south),
-    east: Math.min(bounds.east + lngBuffer, SOFIA_BOUNDS.east),
-    west: Math.max(bounds.west - lngBuffer, SOFIA_BOUNDS.west),
+    north: Math.min(bounds.north + latBuffer, localityBounds.north),
+    south: Math.max(bounds.south - latBuffer, localityBounds.south),
+    east: Math.min(bounds.east + lngBuffer, localityBounds.east),
+    west: Math.max(bounds.west - lngBuffer, localityBounds.west),
   };
 }
 

@@ -3,7 +3,7 @@
 import dotenv from "dotenv";
 import { resolve } from "node:path";
 import { Browser } from "playwright";
-import type { Firestore } from "firebase-admin/firestore";
+import type { OboDb } from "@oboapp/db";
 import { PostLink } from "./types";
 import { extractPostLinks, extractPostDetails } from "./extractors";
 import {
@@ -18,6 +18,7 @@ dotenv.config({ path: resolve(process.cwd(), ".env.local") });
 const INDEX_URL =
   "https://lozenets.sofia.bg/category/%d0%bd%d0%be%d0%b2%d0%b8%d0%bd%d0%b8/";
 const SOURCE_TYPE = "lozenets-sofia-bg";
+const LOCALITY = "bg.sofia";
 const DELAY_BETWEEN_REQUESTS = 2000; // 2 seconds
 
 /**
@@ -26,13 +27,14 @@ const DELAY_BETWEEN_REQUESTS = 2000; // 2 seconds
 const processPost = (
   browser: Browser,
   postLink: PostLink,
-  adminDb: Firestore,
+  db: OboDb,
 ) =>
   processWordpressPost(
     browser,
     postLink,
-    adminDb,
+    db,
     SOURCE_TYPE,
+    LOCALITY,
     DELAY_BETWEEN_REQUESTS,
     extractPostDetails,
   );

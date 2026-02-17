@@ -27,6 +27,7 @@ const BASE_URL = "https://info.ermzapad.bg";
 const INDEX_URL = `${BASE_URL}/webint/vok/avplan.php`;
 const API_URL = INDEX_URL;
 const SOURCE_TYPE = "erm-zapad";
+const LOCALITY = "bg.sofia";
 
 /**
  * Discover active София-град municipalities from the index page
@@ -195,6 +196,7 @@ function buildSourceDocument(pins: PinRecord[]): ErmZapadSourceDocument | null {
     message,
     markdownText: message,
     sourceType: SOURCE_TYPE,
+    locality: LOCALITY,
     crawledAt: new Date(),
     geoJson: JSON.stringify(validation.geoJson),
     categories: ["electricity"],
@@ -236,11 +238,11 @@ async function processMunicipality(
 }
 
 /**
- * Save incidents to Firestore and update summary
+ * Save incidents to database and update summary
  */
 async function saveIncidents(
   incidentMap: Map<string, PinRecord[]>,
-  adminDb: FirebaseFirestore.Firestore,
+  db: import("@oboapp/db").OboDb,
   summary: CrawlSummary,
 ): Promise<void> {
   for (const [eventId, pins] of incidentMap) {
@@ -251,7 +253,7 @@ async function saveIncidents(
         continue;
       }
 
-      const saved = await saveSourceDocumentIfNew(doc, adminDb);
+      const saved = await saveSourceDocumentIfNew(doc, db);
       if (saved) {
         logger.info("Saved incident", { title: doc.title, pinCount: pins.length });
         summary.saved++;
@@ -307,10 +309,11 @@ async function crawl(): Promise<void> {
     logger.info("Incidents after grouping", { incidentCount: incidentMap.size, totalPins: uniquePins.length });
 
     // Dynamic import after dotenv.config
-    const { adminDb } = await import("@/lib/firebase-admin");
+    const { getDb } = await import("@/lib/db");
+    const db = await getDb();
 
     // Save all incidents
-    await saveIncidents(incidentMap, adminDb, totalSummary);
+    await saveIncidents(incidentMap, db, totalSummary);
 
     // Final summary
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);

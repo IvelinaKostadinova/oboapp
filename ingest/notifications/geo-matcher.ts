@@ -3,34 +3,41 @@ import { resolve } from "node:path";
 import * as turf from "@turf/turf";
 import type { Message, Interest, GeoJSONFeatureCollection } from "@/lib/types";
 import { logger } from "@/lib/logger";
+import { validateLocality } from "@oboapp/shared";
 
-// Cache Sofia GeoJSON
-let sofiaGeoJson: GeoJSONFeatureCollection | null = null;
+// Cache GeoJSON files by locality
+const geoJsonCache = new Map<string, GeoJSONFeatureCollection>();
 
 /**
- * Load Sofia administrative boundary GeoJSON (cached)
+ * Load locality GeoJSON file (cached)
+ * Files should be named {locality}.geojson under localities/ (e.g., localities/bg.sofia.geojson)
+ * @throws Error if locality is invalid or file not found
  */
-function loadSofiaGeoJson(): GeoJSONFeatureCollection {
-  if (!sofiaGeoJson) {
-    const sofiaPath = resolve(process.cwd(), "sofia.geojson");
-    const content = readFileSync(sofiaPath, "utf-8");
-    sofiaGeoJson = JSON.parse(content) as GeoJSONFeatureCollection;
+function loadLocalityGeoJson(locality: string): GeoJSONFeatureCollection {
+  // Validate locality to prevent path traversal
+  validateLocality(locality);
+  
+  if (!geoJsonCache.has(locality)) {
+    const path = resolve(process.cwd(), "localities", `${locality}.geojson`);
+    const content = readFileSync(path, "utf-8");
+    const geojson = JSON.parse(content) as GeoJSONFeatureCollection;
+    geoJsonCache.set(locality, geojson);
   }
-  return sofiaGeoJson;
+  return geoJsonCache.get(locality)!;
 }
 
 /**
  * Check if a message's GeoJSON features intersect with a user's interest circle
- * For city-wide messages (cityWide flag), uses sofia.geojson for geometric matching
+ * For city-wide messages (cityWide flag), uses the locality's geojson for geometric matching
  */
 export function matchMessageToInterest(
   message: Message,
   interest: Interest,
 ): { matches: boolean; distance: number | null } {
-  // City-wide messages use Sofia boundary for matching
+  // City-wide messages use locality boundary for matching
   let geoJson = message.geoJson;
   if (message.cityWide) {
-    geoJson = loadSofiaGeoJson();
+    geoJson = loadLocalityGeoJson(message.locality);
   }
 
   if (!geoJson?.features || geoJson.features.length === 0) {

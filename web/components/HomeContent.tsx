@@ -12,18 +12,23 @@ import MapContainer from "@/components/MapContainer";
 import MessageDetailView from "@/components/MessageDetailView";
 import MessagesGrid from "@/components/MessagesGrid";
 import InterestContextMenu from "@/components/InterestContextMenu";
-import CategoryFilterBox from "@/components/CategoryFilterBox";
+import FilterBox from "@/components/FilterBox";
 import GeolocationPrompt from "@/components/GeolocationPrompt";
+import OnboardingPrompt from "@/components/onboarding/OnboardingPrompt";
 import { useInterests } from "@/lib/hooks/useInterests";
 import { useAuth } from "@/lib/auth-context";
 import { useMessages } from "@/lib/hooks/useMessages";
 import { useMapNavigation } from "@/lib/hooks/useMapNavigation";
 import { useInterestManagement } from "@/lib/hooks/useInterestManagement";
 import { useCategoryFilter } from "@/lib/hooks/useCategoryFilter";
+import { useSourceFilter } from "@/lib/hooks/useSourceFilter";
 import { classifyMessage } from "@/lib/message-classification";
 import { createMessageUrl } from "@/lib/url-utils";
 import { getFeaturesCentroid } from "@/lib/geometry-utils";
+import { zIndex } from "@/lib/colors";
+import { navigateBackOrReplace } from "@/lib/navigation-utils";
 import type { Message } from "@/lib/types";
+import type { OnboardingState } from "@/lib/hooks/useOnboardingFlow";
 import { isValidMessageId } from "@oboapp/shared";
 
 /**
@@ -62,6 +67,7 @@ export default function HomeContent() {
     error,
     handleBoundsChanged,
     setSelectedCategories,
+    setSelectedSources,
   } = useMessages();
 
   // Category filtering hook (manages UI state and category selection)
@@ -69,6 +75,13 @@ export default function HomeContent() {
     availableCategories,
     messages, // Pass all messages initially - we'll filter within the hook
     setSelectedCategories,
+  );
+
+  // Source filtering hook (manages UI state and source selection)
+  const sourceFilter = useSourceFilter(
+    messages,
+    categoryFilter.showArchived,
+    setSelectedSources,
   );
 
   // Filter archived messages based on toggle state
@@ -98,6 +111,29 @@ export default function HomeContent() {
 
   // Message hover state for map highlight
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
+  // Onboarding state (lifted from MapContainer for proper DOM ordering)
+  const [onboardingState, setOnboardingState] =
+    React.useState<OnboardingState | null>(null);
+  const [onboardingCallbacks, setOnboardingCallbacks] = React.useState<{
+    onPermissionResult: (permission: NotificationPermission) => void;
+    onDismiss: () => void;
+    onAddInterests: () => void;
+  } | null>(null);
+
+  const handleOnboardingStateChange = useCallback(
+    (
+      state: OnboardingState,
+      callbacks: {
+        onPermissionResult: (permission: NotificationPermission) => void;
+        onDismiss: () => void;
+        onAddInterests: () => void;
+      },
+    ) => {
+      setOnboardingState(state);
+      setOnboardingCallbacks(callbacks);
+    },
+    [],
+  );
 
   // Interest/zone management
   const {
@@ -133,8 +169,7 @@ export default function HomeContent() {
 
   // Handle closing detail view
   const handleCloseDetail = useCallback(() => {
-    // Remove query parameter from URL - this will trigger selectedMessage derivation
-    router.push("/", { scroll: false });
+    navigateBackOrReplace(router, "/");
   }, [router]);
 
   // Derive selected message from URL parameter
@@ -244,7 +279,9 @@ export default function HomeContent() {
     >
       {/* Error messages */}
       {error && (
-        <div className="bg-white border-b shadow-sm z-10 [@media(min-width:1280px)_and_(min-aspect-ratio:4/3)]:absolute [@media(min-width:1280px)_and_(min-aspect-ratio:4/3)]:top-0 [@media(min-width:1280px)_and_(min-aspect-ratio:4/3)]:left-0 [@media(min-width:1280px)_and_(min-aspect-ratio:4/3)]:right-0">
+        <div
+          className={`bg-white border-b shadow-sm ${zIndex.fixed} [@media(min-width:1280px)_and_(min-aspect-ratio:4/3)]:absolute [@media(min-width:1280px)_and_(min-aspect-ratio:4/3)]:top-0 [@media(min-width:1280px)_and_(min-aspect-ratio:4/3)]:left-0 [@media(min-width:1280px)_and_(min-aspect-ratio:4/3)]:right-0`}
+        >
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <div className="p-4 bg-error-light text-error rounded-md">
               {error}
@@ -255,19 +292,34 @@ export default function HomeContent() {
 
       {/* Map Section - Left side on desktop, top on mobile */}
       <div className="relative [@media(min-width:1280px)_and_(min-aspect-ratio:4/3)]:w-3/5 h-[calc(66vh-64px)] [@media(min-width:1280px)_and_(min-aspect-ratio:4/3)]:h-[calc(100vh-80px)] [@media(min-width:1280px)_and_(min-aspect-ratio:4/3)]:sticky [@media(min-width:1280px)_and_(min-aspect-ratio:4/3)]:top-0 [@media(min-width:1280px)_and_(min-aspect-ratio:4/3)]:self-start">
-        {/* Category Filter Box */}
-        <CategoryFilterBox
+        {/* Filter Box */}
+        <FilterBox
           isOpen={categoryFilter.isOpen}
           selectedCategories={categoryFilter.selectedCategories}
+          selectedSources={sourceFilter.selectedSources}
           categoryCounts={categoryFilter.categoryCounts}
-          hasActiveFilters={categoryFilter.hasActiveFilters}
+          sourceCounts={sourceFilter.sourceCounts}
+          hasActiveFilters={
+            categoryFilter.hasActiveFilters || sourceFilter.hasActiveFilters
+          }
+          hasActiveCategoryFilters={
+            categoryFilter.selectedCategories &&
+            categoryFilter.selectedCategories.size > 0
+          }
+          hasActiveSourceFilters={sourceFilter.hasActiveFilters}
           isInitialLoad={categoryFilter.isInitialLoad}
-          isLoadingCounts={categoryFilter.isLoadingCounts}
+          isLoadingCounts={
+            categoryFilter.isLoadingCounts || sourceFilter.isLoadingCounts
+          }
           showArchived={categoryFilter.showArchived}
           onTogglePanel={categoryFilter.togglePanel}
           onToggleCategory={categoryFilter.toggleCategory}
+          onToggleSource={sourceFilter.toggleSource}
           onToggleShowArchived={categoryFilter.toggleShowArchived}
-          onClearAllCategories={categoryFilter.clearAllCategories}
+          onClearAllFilters={() => {
+            categoryFilter.clearAllCategories();
+            sourceFilter.clearAllSources();
+          }}
         />
 
         <MapContainer
@@ -287,9 +339,12 @@ export default function HomeContent() {
           onCancelTargetMode={handleCancelTargetMode}
           onStartAddInterest={handleStartAddInterest}
           onGeolocationPromptChange={setGeolocationPrompt}
+          onOnboardingStateChange={handleOnboardingStateChange}
         />
         {isLoading && (
-          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-white px-4 py-2 rounded-lg shadow-md z-20">
+          <div
+            className={`absolute top-4 left-1/2 transform -translate-x-1/2 bg-white px-4 py-2 rounded-lg shadow-md ${zIndex.nav}`}
+          >
             <p className="text-sm text-neutral">Зареждане...</p>
           </div>
         )}
@@ -324,6 +379,18 @@ export default function HomeContent() {
           onMove={handleMoveInterest}
           onDelete={handleDeleteInterest}
           onClose={handleCloseInterestMenu}
+        />
+      )}
+
+      {/* Onboarding Prompts - rendered at root for proper z-index stacking */}
+      {onboardingState && onboardingCallbacks && (
+        <OnboardingPrompt
+          state={onboardingState}
+          targetModeActive={targetMode.active}
+          user={user}
+          onPermissionResult={onboardingCallbacks.onPermissionResult}
+          onDismiss={onboardingCallbacks.onDismiss}
+          onAddInterests={onboardingCallbacks.onAddInterests}
         />
       )}
 

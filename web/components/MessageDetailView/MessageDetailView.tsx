@@ -7,6 +7,7 @@ import { classifyMessage } from "@/lib/message-classification";
 import { useDragPanel } from "@/lib/hooks/useDragPanel";
 import { useMessageAnimation } from "@/lib/hooks/useMessageAnimation";
 import { useEscapeKey } from "@/lib/hooks/useEscapeKey";
+import { zIndex } from "@/lib/colors";
 import Header from "./Header";
 import SourceDisplay from "./Source";
 import Locations from "./Locations";
@@ -74,7 +75,7 @@ export default function MessageDetailView({
   return (
     <aside
       aria-label="Детайли за сигнала"
-      className={`fixed z-40 bg-white shadow-2xl overflow-y-auto transition-all duration-300 ease-out
+      className={`fixed ${zIndex.overlayContent} bg-white shadow-2xl overflow-y-auto transition-all duration-300 ease-out
         bottom-0 left-0 right-0 max-h-[85vh] rounded-t-2xl
         sm:inset-y-0 sm:left-auto sm:right-0 sm:w-96 sm:max-h-none sm:rounded-none
         ${

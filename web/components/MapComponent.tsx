@@ -9,7 +9,7 @@ import React, {
 } from "react";
 import { GoogleMap, Circle } from "@react-google-maps/api";
 import { Message, Interest } from "@/lib/types";
-import { SOFIA_BOUNDS } from "@/lib/bounds-utils";
+import { getLocalityBounds, getLocalityCenter } from "@/lib/bounds-utils";
 import GeoJSONLayer from "./GeoJSONLayer";
 import InterestCircles from "./InterestCircles";
 import InterestTargetMode from "./InterestTargetMode";
@@ -53,7 +53,6 @@ interface MapComponentProps {
 //   lat: 42.6977,
 //   lng: 23.3341,
 // };
-const SOFIA_CENTER = { lat: 42.6977, lng: 23.3219 };
 
 // Bounds to restrict map panning (imported from @/lib/bounds-utils)
 
@@ -116,8 +115,12 @@ export default function MapComponent({
   hoveredMessageId,
   selectedMessageId,
 }: MapComponentProps) {
+  // Get locality bounds and center
+  const localityBounds = getLocalityBounds();
+  const localityCenter = getLocalityCenter();
+
   const mapRef = useRef<google.maps.Map | null>(null);
-  const latestCenterRef = useRef(SOFIA_CENTER);
+  const latestCenterRef = useRef(localityCenter);
   const [currentZoom, setCurrentZoom] = useState<number>(14);
   const [mapInstance, setMapInstance] = useState<google.maps.Map | null>(null);
   const [userLocation, setUserLocation] = useState<{
@@ -128,20 +131,20 @@ export default function MapComponent({
   const mapOptions: google.maps.MapOptions = useMemo(
     () => ({
       zoom: 14,
-      center: initialCenter || SOFIA_CENTER,
+      center: initialCenter || localityCenter,
       mapTypeControl: false,
       streetViewControl: false,
       fullscreenControl: false,
       styles: mapStyles,
       clickableIcons: false, // Disable clicking on POIs (shops, hospitals, etc.)
       restriction: {
-        latLngBounds: SOFIA_BOUNDS,
+        latLngBounds: localityBounds,
         strictBounds: true,
       },
       minZoom: 12,
       maxZoom: 18,
     }),
-    [initialCenter],
+    [initialCenter, localityBounds, localityCenter],
   );
 
   const centerMap = useCallback(

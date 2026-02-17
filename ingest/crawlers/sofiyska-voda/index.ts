@@ -2,7 +2,7 @@
 
 import dotenv from "dotenv";
 import { resolve } from "node:path";
-import type { Firestore } from "firebase-admin/firestore";
+import type { OboDb } from "@oboapp/db";
 import {
   ArcGisFeature,
   ArcGisQueryResponse,
@@ -19,6 +19,7 @@ import { logger } from "@/lib/logger";
 // Load environment variables to match the rest of the crawlers
 dotenv.config({ path: resolve(process.cwd(), ".env.local") });
 
+const LOCALITY = "bg.sofia";
 const BASE_URL =
   "https://gispx.sofiyskavoda.bg/arcgis/rest/services/WSI_PUBLIC/InfoCenter_Public/MapServer";
 const REQUEST_HEADERS = {
@@ -120,16 +121,20 @@ async function callArcGis(url: string): Promise<ArcGisQueryResponse> {
 
 async function saveSourceDocument(
   doc: SofiyskaVodaSourceDocument,
-  adminDb: Firestore,
+  db: OboDb,
 ): Promise<void> {
-  await saveSourceDocumentShared(doc, adminDb, {
-    transformData: (d) => ({
-      ...d,
-      geoJson: JSON.stringify(d.geoJson),
-      crawledAt: new Date(d.crawledAt),
-    }),
-    logSuccess: false,
-  });
+  await saveSourceDocumentShared(
+    { ...doc, locality: LOCALITY },
+    db,
+    {
+      transformData: (d) => ({
+        ...d,
+        geoJson: JSON.stringify(d.geoJson),
+        crawledAt: new Date(d.crawledAt),
+      }),
+      logSuccess: false,
+    },
+  );
   logger.info("Записано събитие", { title: doc.title });
 }
 
@@ -138,10 +143,10 @@ export async function crawl(): Promise<void> {
 
   const summary: CrawlSummary = { saved: 0, skipped: 0, emptyLayers: 0 };
   const seenUrls = new Set<string>();
-  const adminDb = await maybeInitFirestore();
+  const db = await maybeInitDb();
 
   for (const layer of LAYERS) {
-    const layerSummary = await processLayer(layer, seenUrls, adminDb);
+    const layerSummary = await processLayer(layer, seenUrls, db);
     summary.saved += layerSummary.saved;
     summary.skipped += layerSummary.skipped;
     summary.emptyLayers += layerSummary.emptyLayers;
@@ -150,15 +155,15 @@ export async function crawl(): Promise<void> {
   logSummary(summary);
 }
 
-async function maybeInitFirestore(): Promise<Firestore | null> {
-  const firebase = await import("@/lib/firebase-admin");
-  return firebase.adminDb;
+async function maybeInitDb(): Promise<OboDb | null> {
+  const { getDb } = await import("@/lib/db");
+  return getDb();
 }
 
 async function processLayer(
   layer: LayerConfig,
   seenUrls: Set<string>,
-  adminDb: Firestore | null,
+  db: OboDb | null,
 ): Promise<CrawlSummary> {
   logger.info("Зареждане на слой", { layerId: layer.id, layerName: layer.name });
   const features = await fetchLayerFeatures(layer);
@@ -171,7 +176,7 @@ async function processLayer(
   const result: CrawlSummary = { saved: 0, skipped: 0, emptyLayers: 0 };
 
   for (const feature of features) {
-    await handleFeature(feature, layer, seenUrls, adminDb, result);
+    await handleFeature(feature, layer, seenUrls, db, result);
   }
 
   return result;
@@ -181,7 +186,7 @@ async function handleFeature(
   feature: ArcGisFeature,
   layer: LayerConfig,
   seenUrls: Set<string>,
-  adminDb: Firestore | null,
+  db: OboDb | null,
   summary: CrawlSummary,
 ): Promise<void> {
   const document = await buildSourceDocument(feature, layer, DATE_FORMATTER);
@@ -194,17 +199,17 @@ async function handleFeature(
   }
   seenUrls.add(document.url);
 
-  if (!adminDb) {
-    throw new Error("Firestore is not initialized");
+  if (!db) {
+    throw new Error("Database is not initialized");
   }
 
-  const exists = await isUrlProcessed(document.url, adminDb);
+  const exists = await isUrlProcessed(document.url, db);
   if (exists) {
     summary.skipped += 1;
     return;
   }
 
-  await saveSourceDocument(document, adminDb);
+  await saveSourceDocument(document, db);
   summary.saved += 1;
 }
 

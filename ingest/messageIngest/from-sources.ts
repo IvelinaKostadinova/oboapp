@@ -2,7 +2,7 @@
 
 import * as dotenv from "dotenv";
 import { resolve } from "node:path";
-import type { Firestore } from "firebase-admin/firestore";
+import type { OboDb } from "@oboapp/db";
 import { GeoJSONFeatureCollection } from "@/lib/types";
 import { isWithinBoundaries, loadBoundaries } from "@/lib/boundary-utils";
 import { logger } from "@/lib/logger";
@@ -24,6 +24,7 @@ interface SourceDocument {
   timespanStart?: Date; // Optional timespan start from source
   timespanEnd?: Date; // Optional timespan end from source
   cityWide?: boolean; // Whether source applies to entire city (hidden from map)
+  locality?: string; // Locality identifier (e.g., 'bg.sofia')
 }
 
 interface IngestOptions {
@@ -44,9 +45,6 @@ interface IngestSummary {
   failed: number;
   errors: Array<{ url: string; error: string }>;
 }
-
-const SYSTEM_USER_ID = "system";
-const SYSTEM_USER_EMAIL = "system@oboapp.local";
 
 async function parseArguments(): Promise<IngestOptions> {
   const args = process.argv.slice(2);
@@ -74,51 +72,53 @@ async function parseArguments(): Promise<IngestOptions> {
 }
 
 async function fetchSources(
-  adminDb: Firestore,
+  db: OboDb,
   options: IngestOptions,
 ): Promise<SourceDocument[]> {
-  let query = adminDb.collection("sources") as FirebaseFirestore.Query;
+  const where: { field: string; op: "=="; value: unknown }[] = [];
   const filters: string[] = [];
 
   if (options.sourceType) {
-    query = query.where("sourceType", "==", options.sourceType);
+    where.push({ field: "sourceType", op: "==", value: options.sourceType });
     filters.push(`sourceType=${options.sourceType}`);
   }
 
   if (options.limit) {
-    query = query.limit(options.limit);
     filters.push(`limit=${options.limit}`);
   }
 
-  const snapshot = await query.get();
-  const sources: SourceDocument[] = [];
+  const docs = await db.sources.findMany({
+    where: where.length > 0 ? where : undefined,
+    limit: options.limit,
+  });
 
-  for (const doc of snapshot.docs) {
-    const data = doc.data();
-    sources.push({
-      url: data.url,
-      datePublished: data.datePublished,
-      title: data.title,
-      message: data.message,
-      sourceType: data.sourceType,
-      crawledAt: data.crawledAt?.toDate() ?? new Date(),
-      geoJson: data.geoJson,
-      markdownText: data.markdownText,
-      categories: data.categories,
-      isRelevant: data.isRelevant,
-      timespanStart: data.timespanStart?.toDate(),
-      timespanEnd: data.timespanEnd?.toDate(),
-      cityWide: data.cityWide,
-    });
-  }
+  const sources: SourceDocument[] = docs.map((data) => ({
+    url: data.url as string,
+    datePublished: data.datePublished as string,
+    title: data.title as string,
+    message: data.message as string,
+    sourceType: data.sourceType as string,
+    crawledAt: data.crawledAt instanceof Date ? data.crawledAt : new Date(data.crawledAt as string ?? Date.now()),
+    geoJson: data.geoJson as string | GeoJSONFeatureCollection | undefined,
+    markdownText: data.markdownText as string | undefined,
+    categories: data.categories as string[] | undefined,
+    isRelevant: data.isRelevant as boolean | undefined,
+    timespanStart: data.timespanStart instanceof Date ? data.timespanStart : (data.timespanStart ? new Date(data.timespanStart as string) : undefined),
+    timespanEnd: data.timespanEnd instanceof Date ? data.timespanEnd : (data.timespanEnd ? new Date(data.timespanEnd as string) : undefined),
+    cityWide: data.cityWide as boolean | undefined,
+    locality: data.locality as string | undefined,
+  }));
 
   const filterInfo = filters.length > 0 ? ` (${filters.join(", ")})` : "";
-  logger.info("Fetched sources", { count: sources.length, filters: filterInfo || undefined });
+  logger.info("Fetched sources", {
+    count: sources.length,
+    filters: filterInfo || undefined,
+  });
   return sources;
 }
 
 async function getAlreadyIngestedSet(
-  adminDb: Firestore,
+  db: OboDb,
   sources: SourceDocument[],
 ): Promise<Set<string>> {
   if (sources.length === 0) {
@@ -128,23 +128,16 @@ async function getAlreadyIngestedSet(
   const { encodeDocumentId } = await import("../crawlers/shared/firestore");
   const sourceDocumentIds = sources.map((s) => encodeDocumentId(s.url));
 
-  // Firestore 'in' queries support up to 30 values, so we need to batch
-  const BATCH_SIZE = 30;
+  const docs = await db.messages.findBySourceDocumentIds(
+    sourceDocumentIds,
+    ["sourceDocumentId"],
+  );
+
   const alreadyIngestedIds = new Set<string>();
-
-  for (let i = 0; i < sourceDocumentIds.length; i += BATCH_SIZE) {
-    const batch = sourceDocumentIds.slice(i, i + BATCH_SIZE);
-    const messagesSnapshot = await adminDb
-      .collection("messages")
-      .where("sourceDocumentId", "in", batch)
-      .select("sourceDocumentId") // Only fetch the field we need
-      .get();
-
-    for (const doc of messagesSnapshot.docs) {
-      const sourceDocId = doc.data().sourceDocumentId;
-      if (sourceDocId) {
-        alreadyIngestedIds.add(sourceDocId);
-      }
+  for (const doc of docs) {
+    const sourceDocId = doc.sourceDocumentId as string;
+    if (sourceDocId) {
+      alreadyIngestedIds.add(sourceDocId);
     }
   }
 
@@ -153,7 +146,7 @@ async function getAlreadyIngestedSet(
 
 async function ingestSource(
   source: SourceDocument,
-  adminDb: Firestore,
+  _db: OboDb,
   dryRun: boolean,
   boundaries: GeoJSONFeatureCollection | null,
   sourceDocumentId: string,
@@ -172,7 +165,8 @@ async function ingestSource(
     logMeta.timespanStart = source.timespanStart.toISOString();
     logMeta.timespanEnd = source.timespanEnd.toISOString();
   } else if (source.geoJson) {
-    logMeta.warning = "Source has precomputed GeoJSON but missing timespans (will fallback to crawledAt)";
+    logMeta.warning =
+      "Source has precomputed GeoJSON but missing timespans (will fallback to crawledAt)";
   }
   logger.info("Processing message", logMeta);
 
@@ -189,25 +183,24 @@ async function ingestSource(
   // Dynamically import messageIngest to avoid loading firebase-admin at startup
   const { messageIngest } = await import("./index");
 
+  if (!source.locality) {
+    throw new Error(`Source missing required locality field: ${source.url}`);
+  }
+
   // Use the sourceType as the source identifier for messageIngest
-  const result = await messageIngest(
-    source.message,
-    source.sourceType,
-    SYSTEM_USER_ID,
-    SYSTEM_USER_EMAIL,
-    {
-      precomputedGeoJson: geoJson,
-      sourceUrl: source.url,
-      boundaryFilter: boundaries ?? undefined,
-      crawledAt: source.crawledAt,
-      markdownText: source.markdownText,
-      categories: source.categories,
-      isRelevant: source.isRelevant,
-      timespanStart: source.timespanStart,
-      timespanEnd: source.timespanEnd,
-      cityWide: source.cityWide,
-    },
-  );
+  const result = await messageIngest(source.message, source.sourceType, {
+    precomputedGeoJson: geoJson,
+    sourceUrl: source.url,
+    boundaryFilter: boundaries ?? undefined,
+    crawledAt: source.crawledAt,
+    markdownText: source.markdownText,
+    categories: source.categories,
+    isRelevant: source.isRelevant,
+    timespanStart: source.timespanStart,
+    timespanEnd: source.timespanEnd,
+    cityWide: source.cityWide,
+    locality: source.locality,
+  });
 
   logger.info("Completed processing source", {
     title: source.title,
@@ -245,7 +238,11 @@ async function filterByAge(
   }
 
   if (tooOld > 0) {
-    logger.info("Age filter applied", { recent: recentSources.length, tooOld, maxAgeInDays });
+    logger.info("Age filter applied", {
+      recent: recentSources.length,
+      tooOld,
+      maxAgeInDays,
+    });
   }
 
   return { recentSources, tooOld };
@@ -293,28 +290,33 @@ async function filterByBoundaries(
     }
   }
 
-  logger.info("Boundary filter applied", { withinBounds: withinBounds.length, outsideBounds });
+  logger.info("Boundary filter applied", {
+    withinBounds: withinBounds.length,
+    outsideBounds,
+  });
 
   return { withinBounds, outsideBounds };
 }
 
-async function maybeInitFirestore(): Promise<Firestore> {
-  const firebase = await import("@/lib/firebase-admin");
-  return firebase.adminDb;
+async function maybeInitDb(): Promise<OboDb> {
+  const { getDb } = await import("@/lib/db");
+  return getDb();
 }
 
 export async function ingest(
   options: IngestOptions = {},
 ): Promise<IngestSummary> {
-  logger.info("Starting source ingestion", { mode: options.dryRun ? "dry-run" : "production" });
+  logger.info("Starting source ingestion", {
+    mode: options.dryRun ? "dry-run" : "production",
+  });
 
   const boundaries = loadBoundaries(options.boundariesPath);
   if (boundaries) {
     logger.info("Using boundary filtering");
   }
-  const adminDb = await maybeInitFirestore();
+  const db = await maybeInitDb();
 
-  const allSources = await fetchSources(adminDb, options);
+  const allSources = await fetchSources(db, options);
 
   // Filter by age first (skip sources older than 90 days)
   const { recentSources, tooOld } = await filterByAge(allSources);
@@ -330,14 +332,16 @@ export async function ingest(
 
   // Batch-check which sources are already ingested (avoids 1371 sequential DB queries!)
   const { encodeDocumentId } = await import("../crawlers/shared/firestore");
-  const alreadyIngestedSet = await getAlreadyIngestedSet(adminDb, withinBounds);
+  const alreadyIngestedSet = await getAlreadyIngestedSet(db, withinBounds);
   const sourcesToIngest = withinBounds.filter(
     (s) => !alreadyIngestedSet.has(encodeDocumentId(s.url)),
   );
   const alreadyIngestedCount = withinBounds.length - sourcesToIngest.length;
 
   if (alreadyIngestedCount > 0) {
-    logger.info("Skipping already-ingested sources", { count: alreadyIngestedCount });
+    logger.info("Skipping already-ingested sources", {
+      count: alreadyIngestedCount,
+    });
   }
 
   const summary: IngestSummary = {
@@ -357,7 +361,7 @@ export async function ingest(
     try {
       const wasIngested = await ingestSource(
         source,
-        adminDb,
+        db,
         options.dryRun ?? false,
         boundaries,
         sourceDocumentId,
@@ -372,13 +376,19 @@ export async function ingest(
 
       // Don't log as error if it's just outside boundaries or filtered as irrelevant
       if (errorMessage.includes("No features within specified boundaries")) {
-        logger.info("Source outside boundaries after geocoding", { title: source.title });
+        logger.info("Source outside boundaries after geocoding", {
+          title: source.title,
+        });
       } else if (errorMessage.includes("Message filtering failed")) {
         summary.filtered++;
         logger.info("Source filtered as irrelevant", { title: source.title });
       } else {
         summary.errors.push({ url: source.url, error: errorMessage });
-        logger.error("Failed to ingest source", { title: source.title, error: errorMessage, url: source.url });
+        logger.error("Failed to ingest source", {
+          title: source.title,
+          error: errorMessage,
+          url: source.url,
+        });
       }
     }
   }
@@ -407,7 +417,10 @@ function logSummary(summary: IngestSummary, dryRun: boolean): void {
     summaryData.alreadyIngested = summary.alreadyIngested;
     if (summary.filtered > 0) {
       summaryData.filtered = summary.filtered;
-      summaryData.filterPercentage = ((summary.filtered / summary.withinBounds) * 100).toFixed(1);
+      summaryData.filterPercentage = (
+        (summary.filtered / summary.withinBounds) *
+        100
+      ).toFixed(1);
     }
     if (summary.failed > 0) {
       summaryData.failed = summary.failed;
@@ -426,7 +439,9 @@ if (require.main === module) {
     const options = await parseArguments();
     await ingest(options);
   })().catch((error) => {
-    logger.error("Ingestion failed", { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Ingestion failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     process.exit(1);
   });
 }

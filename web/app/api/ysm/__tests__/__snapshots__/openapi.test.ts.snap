@@ -302,6 +302,9 @@ exports[`YSM OpenAPI > matches snapshot 1`] = `
           "id": {
             "type": "string",
           },
+          "locality": {
+            "type": "string",
+          },
           "markdownText": {
             "type": "string",
           },
@@ -449,6 +452,7 @@ exports[`YSM OpenAPI > matches snapshot 1`] = `
         "required": [
           "text",
           "createdAt",
+          "locality",
         ],
         "type": "object",
       },
@@ -741,6 +745,9 @@ exports[`YSM OpenAPI > matches snapshot 1`] = `
                 "id": {
                   "type": "string",
                 },
+                "locality": {
+                  "type": "string",
+                },
                 "markdownText": {
                   "type": "string",
                 },
@@ -888,6 +895,7 @@ exports[`YSM OpenAPI > matches snapshot 1`] = `
               "required": [
                 "text",
                 "createdAt",
+                "locality",
               ],
               "type": "object",
             },
@@ -1055,6 +1063,9 @@ exports[`YSM OpenAPI > matches snapshot 1`] = `
                 "id": {
                   "type": "string",
                 },
+                "locality": {
+                  "type": "string",
+                },
                 "logoUrl": {
                   "type": "string",
                 },
@@ -1070,6 +1081,7 @@ exports[`YSM OpenAPI > matches snapshot 1`] = `
                 "name",
                 "url",
                 "logoUrl",
+                "locality",
               ],
               "type": "object",
             },

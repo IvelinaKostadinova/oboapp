@@ -34,7 +34,7 @@ graph LR
 
 ```bash
 # Run a specific crawler
-pnpm crawl -- --source rayon-oborishte-bg
+pnpm crawl --source rayon-oborishte-bg
 
 # Sync GTFS bus stop data
 pnpm gtfs-stops

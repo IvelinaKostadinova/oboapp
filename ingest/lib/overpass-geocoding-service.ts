@@ -7,11 +7,12 @@ import {
 import * as turf from "@turf/turf";
 import type { Feature, MultiLineString, Position } from "geojson";
 import {
-  SOFIA_BOUNDS,
-  SOFIA_CENTER,
-  SOFIA_BBOX,
-  isWithinSofia,
+  getLocalityBounds,
+  getLocalityCenter,
+  getLocalityBbox,
 } from "./geocoding-utils";
+import { isWithinBounds } from "@oboapp/shared";
+import { getLocality } from "./target-locality";
 import { delay } from "./delay";
 import { roundCoordinate } from "@/lib/coordinate-utils";
 import { logger } from "@/lib/logger";
@@ -112,15 +113,17 @@ async function getStreetGeometryFromOverpass(
 
     let query: string;
 
+    const bbox = getLocalityBbox();
+
     if (isSquare) {
       // Search for squares as nodes or ways with place=square
       query = `
         [out:json][timeout:25];
         (
-          node["place"="square"]["name"~"${normalizedName}",i](${SOFIA_BBOX});
-          way["place"="square"]["name"~"${normalizedName}",i](${SOFIA_BBOX});
-          node["place"="square"]["name:bg"~"${normalizedName}",i](${SOFIA_BBOX});
-          way["place"="square"]["name:bg"~"${normalizedName}",i](${SOFIA_BBOX});
+          node["place"="square"]["name"~"${normalizedName}",i](${bbox});
+          way["place"="square"]["name"~"${normalizedName}",i](${bbox});
+          node["place"="square"]["name:bg"~"${normalizedName}",i](${bbox});
+          way["place"="square"]["name:bg"~"${normalizedName}",i](${bbox});
         );
         out geom;
       `;
@@ -134,8 +137,8 @@ async function getStreetGeometryFromOverpass(
       query = `
         [out:json][timeout:25];
         (
-          way${highwayFilter}["name"~"${normalizedName}",i](${SOFIA_BBOX});
-          way${highwayFilter}["name:bg"~"${normalizedName}",i](${SOFIA_BBOX});
+          way${highwayFilter}["name"~"${normalizedName}",i](${bbox});
+          way${highwayFilter}["name:bg"~"${normalizedName}",i](${bbox});
         );
         out geom;
       `;
@@ -332,9 +335,9 @@ function findGeometricIntersection(
         return { lng: point[0], lat: point[1] };
       }
 
-      // Multiple intersections - use Sofia city center as reference point
-      const target = SOFIA_CENTER;
-      const targetPoint = turf.point([target.lng, target.lat]);
+      // Multiple intersections - use locality center as reference point
+      const localityCenter = getLocalityCenter();
+      const targetPoint = turf.point([localityCenter.lng, localityCenter.lat]);
 
       const intersectionsWithDistance = intersections.features.map(
         (feature) => {
@@ -715,18 +718,17 @@ async function geocodeAddressWithNominatim(
   try {
     const normalizedAddress = normalizeAddressForNominatim(address);
 
-    // Ensure address includes Sofia context
-    const fullAddress =
-      normalizedAddress.includes("София") || normalizedAddress.includes("Sofia")
-        ? normalizedAddress
-        : `${normalizedAddress}, София, България`;
+    // Use normalized address with bounded search
+    // The bounds parameter limits results to the configured locality
+    const fullAddress = normalizedAddress;
 
-    // Add bounded search to Sofia area and increase limit to filter results
+    // Add bounded search to locality area and increase limit to filter results
+    const bounds = getLocalityBounds();
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
       fullAddress,
     )}&format=json&limit=5&addressdetails=1&bounded=1&viewbox=${
-      SOFIA_BOUNDS.west
-    },${SOFIA_BOUNDS.south},${SOFIA_BOUNDS.east},${SOFIA_BOUNDS.north}`;
+      bounds.west
+    },${bounds.south},${bounds.east},${bounds.north}`;
 
     const response = await fetch(url, {
       headers: {
@@ -749,8 +751,9 @@ async function geocodeAddressWithNominatim(
           lng: Number.parseFloat(result.lon),
         };
 
-        // Validate coordinates are within Sofia
-        if (isWithinSofia(coords.lat, coords.lng)) {
+        // Validate coordinates are within locality
+        const locality = getLocality();
+        if (isWithinBounds(locality, coords.lat, coords.lng)) {
           logger.info("Nominatim geocoded address", {
             address,
             lat: coords.lat,
@@ -758,8 +761,9 @@ async function geocodeAddressWithNominatim(
           });
           return coords;
         }
-        logger.warn("Nominatim result outside Sofia", {
+        logger.warn("Nominatim result outside target locality", {
           address,
+          locality,
           lat: coords.lat,
           lng: coords.lng,
         });

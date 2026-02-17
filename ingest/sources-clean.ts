@@ -3,7 +3,7 @@
 import { Command } from "commander";
 import { resolve } from "node:path";
 import dotenv from "dotenv";
-import { verifyEnvSet } from "@/lib/verify-env";
+import { verifyDbEnv } from "@/lib/verify-env";
 import { logger } from "@/lib/logger";
 
 const program = new Command();
@@ -22,8 +22,8 @@ program
     "after",
     `
 Examples:
-  $ pnpm sources:clean -- --retain lozenets-sofia-bg
-  $ pnpm sources:clean -- --retain rayon-oborishte-bg --dry-run
+  $ pnpm sources:clean --retain lozenets-sofia-bg
+  $ pnpm sources:clean --retain rayon-oborishte-bg --dry-run
 
 IMPORTANT: Only deletes sources that have NOT been ingested into messages.
 Sources that have corresponding messages in the messages collection will be preserved.
@@ -32,7 +32,7 @@ Sources that have corresponding messages in the messages collection will be pres
   .action(async (options) => {
     // Ensure environment variables are loaded and required keys are present
     dotenv.config({ path: resolve(process.cwd(), ".env.local") });
-    verifyEnvSet(["FIREBASE_SERVICE_ACCOUNT_KEY"]);
+    verifyDbEnv();
 
     try {
       const { cleanSources } = await import("./lib/sources-clean");

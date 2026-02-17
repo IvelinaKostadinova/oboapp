@@ -18,6 +18,7 @@ import { logger } from "@/lib/logger";
 dotenv.config({ path: resolve(process.cwd(), ".env.local") });
 
 const SOURCE_TYPE = "nimh-severe-weather";
+const LOCALITY = "bg.sofia";
 const TARGET_URL = "https://weather.bg/obshtini/index.php?z=u&o=SOF";
 
 interface NimhSourceDocument extends SourceDocumentWithGeoJson {
@@ -98,6 +99,7 @@ export async function crawl(): Promise<void> {
       message,
       markdownText,
       sourceType: SOURCE_TYPE,
+      locality: LOCALITY,
       crawledAt: new Date(),
       geoJson: createMinimalGeoJson(),
       categories: ["weather"],
@@ -107,10 +109,11 @@ export async function crawl(): Promise<void> {
       cityWide: true,
     };
 
-    // Load Firebase Admin (lazy)
-    const { adminDb } = await import("@/lib/firebase-admin");
+    // Load database (lazy)
+    const { getDb } = await import("@/lib/db");
+    const db = await getDb();
 
-    const saved = await saveSourceDocumentIfNew(doc, adminDb, {
+    const saved = await saveSourceDocumentIfNew(doc, db, {
       transformData: (d) => ({
         ...d,
         geoJson: JSON.stringify(d.geoJson),

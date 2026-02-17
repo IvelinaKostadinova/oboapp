@@ -24,6 +24,7 @@ const buildFeatureCollection = (count: number) => ({
 const buildMessage = (overrides: Partial<Message>): Message => ({
   text: "Test message",
   createdAt: new Date().toISOString(),
+  locality: "bg.sofia",
   ...overrides,
 });
 
@@ -469,6 +470,31 @@ describe("useCategoryFilter hook", () => {
       expect(result.current.selectedCategories.size).toBe(0);
       expect(result.current.showArchived).toBe(false);
       expect(result.current.hasActiveFilters).toBe(false);
+    });
+  });
+
+  describe("isInitialLoad", () => {
+    it("becomes false after 300ms even with empty viewport messages (zero results scenario)", async () => {
+      const onCategorySelectionChange = vi.fn();
+
+      const { result } = renderHook(() =>
+        useCategoryFilter(
+          availableCategories,
+          [], // Empty messages - simulates filters resulting in zero records
+          onCategorySelectionChange,
+        ),
+      );
+
+      // Should start with isInitialLoad = true
+      expect(result.current.isInitialLoad).toBe(true);
+
+      // Wait for the 300ms delay
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 350));
+      });
+
+      // Should now be false - categories are static and don't need messages to display
+      expect(result.current.isInitialLoad).toBe(false);
     });
   });
 });

@@ -11,6 +11,7 @@ env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
   FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
   ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+  LOCALITY: ${{ secrets.LOCALITY }}
   REGION: europe-west1
   IMAGE_NAME: oborishte-ingest
 
@@ -41,7 +42,7 @@ jobs:
 
       - name: Run unit tests
         working-directory: ./ingest
-        run: pnpm run test:run
+        run: pnpm test:run
 
   test-web:
     name: Test Web
@@ -69,7 +70,7 @@ jobs:
 
       - name: Run unit tests
         working-directory: ./web
-        run: pnpm run test:run
+        run: pnpm test:run
 
   build-and-deploy:
     name: Build and Deploy to GCP
@@ -182,6 +183,8 @@ jobs:
             -var="image_tag=${IMAGE_TAG}" \
             -var="firebase_project_id=$FIREBASE_PROJECT_ID" \
             -var="alert_email=$ALERT_EMAIL" \
+            -var="locality=$LOCALITY" \
+            -var="ci_service_account_email=${{ secrets.GCP_SERVICE_ACCOUNT }}" \
             -out=tfplan
 
       - name: Terraform Apply

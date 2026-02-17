@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebase-admin";
+import { getDb } from "@/lib/db";
 import type { Message } from "@/lib/types";
 import {
   clampBounds,
@@ -9,16 +9,14 @@ import {
 } from "@/lib/bounds-utils";
 import { getCentroid } from "@/lib/geometry-utils";
 import { messagesQuerySchema } from "@/lib/api-query.schema";
-import { docToMessage } from "@/lib/doc-to-message";
-import admin from "firebase-admin";
-
-const { or, where } = admin.firestore.Filter;
+import { recordToMessage } from "@/lib/doc-to-message";
 
 const DEFAULT_RELEVANCE_DAYS = 7;
 const CLUSTER_ZOOM_THRESHOLD = 15;
 
 export async function GET(request: Request) {
   try {
+    const db = await getDb();
     // Validate query params
     const { searchParams } = new URL(request.url);
     const parsed = messagesQuerySchema.safeParse(
@@ -32,8 +30,15 @@ export async function GET(request: Request) {
       );
     }
 
-    const { north, south, east, west, zoom, categories: selectedCategories } =
-      parsed.data;
+    const {
+      north,
+      south,
+      east,
+      west,
+      zoom,
+      categories: selectedCategories,
+      sources: selectedSources,
+    } = parsed.data;
 
     let viewportBounds: ViewportBounds | null = null;
     if (
@@ -64,115 +69,256 @@ export async function GET(request: Request) {
       return NextResponse.json({ messages: [] });
     }
 
-    // Use Admin SDK for reading messages
-    const messagesRef = adminDb.collection("messages");
+    // Validate and deduplicate sources
+    // Note: Unlike categories, empty sources param (?sources=) is treated as "no filter"
+    // to maintain backwards compatibility and allow flexible querying
+    let validatedSources: string[] | undefined;
+    if (selectedSources && selectedSources.length > 0) {
+      const { getCurrentLocalitySources } = await import("@/lib/source-utils");
+      const localitySources = getCurrentLocalitySources();
+      const validSourceIds = new Set(localitySources.map((s) => s.id));
+      
+      // Deduplicate and filter to only valid sources for this locality
+      const uniqueSources = Array.from(new Set(selectedSources));
+      validatedSources = uniqueSources.filter((sourceId) =>
+        validSourceIds.has(sourceId),
+      );
 
+      // If no valid sources remain after validation, return empty result
+      if (validatedSources.length === 0) {
+        return NextResponse.json({ messages: [] });
+      }
+    }
+
+    // Query messages using database abstraction
     let allMessages: Message[] = [];
 
-    // Apply category filtering if categories are selected
-    if (selectedCategories && selectedCategories.length > 0) {
-      // Separate uncategorized from real categories
+    // Determine if we need source filtering
+    const hasSourceFilter = validatedSources && validatedSources.length > 0;
+    const hasCategoryFilter = selectedCategories && selectedCategories.length > 0;
+
+    // Apply filtering based on what's selected
+    if (hasCategoryFilter && hasSourceFilter) {
+      // Both category and source filters
       const realCategories = selectedCategories.filter(
         (c) => c !== "uncategorized",
       );
       const includeUncategorized = selectedCategories.includes("uncategorized");
 
-      // If only uncategorized is selected, we need to fetch all and filter in memory
-      // because Firestore doesn't have an index for categories == null with timespanEnd ordering
       if (includeUncategorized && realCategories.length === 0) {
-        // Fetch messages with timespanEnd >= cutoffDate (server-side filtering)
-        const snapshot = await messagesRef
-          .where("timespanEnd", ">=", cutoffDate)
-          .orderBy("timespanEnd", "desc")
-          .get();
-
-        const uncategorizedMessages: Message[] = [];
-
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          const categories = data.categories;
-
-          // Check if message is uncategorized
-          const isUncategorized =
-            !categories ||
-            (Array.isArray(categories) && categories.length === 0);
-
-          if (isUncategorized) {
-            uncategorizedMessages.push(docToMessage(doc));
-          }
+        // Only uncategorized + source filter
+        const docs = await db.messages.findMany({
+          where: [
+            { field: "timespanEnd", op: ">=", value: cutoffDate },
+          ],
+          orderBy: [{ field: "timespanEnd", direction: "desc" }],
         });
 
-        allMessages = uncategorizedMessages;
+        const sourceSet = new Set(validatedSources);
+        allMessages = docs
+          .filter((doc) => {
+            const categories = doc.categories as string[] | undefined;
+            const isUncategorized =
+              !categories ||
+              (Array.isArray(categories) && categories.length === 0);
+            return isUncategorized && doc.source && sourceSet.has(doc.source as string);
+          })
+          .map(recordToMessage);
       } else {
-        // We have real categories (and possibly uncategorized)
-        const queryPromises: Promise<FirebaseFirestore.QuerySnapshot>[] = [];
+        const queryPromises: Promise<Record<string, unknown>[]>[] = [];
 
-        // Query for real categories using OR filter with server-side timespan filtering
         if (realCategories.length > 0) {
-          const categoryFilters = realCategories.map((cat) =>
-            where("categories", "array-contains", cat),
+          queryPromises.push(
+            db.messages.findMany({
+              where: [
+                { field: "categories", op: "array-contains-any", value: realCategories },
+                { field: "timespanEnd", op: ">=", value: cutoffDate },
+              ],
+              orderBy: [{ field: "timespanEnd", direction: "desc" }],
+            }),
           );
-
-          const categoriesQuery = messagesRef
-            .where(or(...categoryFilters))
-            .where("timespanEnd", ">=", cutoffDate)
-            .orderBy("timespanEnd", "desc");
-
-          queryPromises.push(categoriesQuery.get());
         }
 
-        // If uncategorized is also selected, fetch with timespan filter
         if (includeUncategorized) {
-          const allMessagesQuery = messagesRef
-            .where("timespanEnd", ">=", cutoffDate)
-            .orderBy("timespanEnd", "desc");
-
-          queryPromises.push(allMessagesQuery.get());
+          queryPromises.push(
+            db.messages.findMany({
+              where: [
+                { field: "timespanEnd", op: ">=", value: cutoffDate },
+              ],
+              orderBy: [{ field: "timespanEnd", direction: "desc" }],
+            }),
+          );
         }
 
-        // Execute queries in parallel
-        const snapshots = await Promise.all(queryPromises);
-
-        // Merge results and deduplicate by message ID
+        const results = await Promise.all(queryPromises);
         const messagesMap = new Map<string, Message>();
+        const sourceSet = new Set(validatedSources);
 
-        for (let i = 0; i < snapshots.length; i++) {
-          const snapshot = snapshots[i];
-          const isUncategorizedSnapshot =
-            includeUncategorized && i === snapshots.length - 1;
+        for (let i = 0; i < results.length; i++) {
+          const docs = results[i];
+          const isUncategorizedQuery =
+            includeUncategorized && i === results.length - 1;
 
-          snapshot.forEach((doc) => {
-            const data = doc.data();
-
-            // If this is the uncategorized snapshot, filter for uncategorized only
-            if (isUncategorizedSnapshot) {
-              const categories = data.categories;
+          for (const doc of docs) {
+            if (isUncategorizedQuery) {
+              const categories = doc.categories as string[] | undefined;
               const isUncategorized =
                 !categories ||
                 (Array.isArray(categories) && categories.length === 0);
-              if (!isUncategorized) return; // Skip categorized messages
+              if (!isUncategorized) continue;
             }
 
-            // Only add if not already present (deduplication)
-            if (!messagesMap.has(doc.id)) {
-              messagesMap.set(doc.id, docToMessage(doc));
+            // Apply source filter
+            const docId = doc._id as string;
+            if (doc.source && sourceSet.has(doc.source as string)) {
+              if (!messagesMap.has(docId)) {
+                messagesMap.set(docId, recordToMessage(doc));
+              }
             }
-          });
+          }
         }
 
-        allMessages = Array.from(messagesMap.values());
+        allMessages = Array.from(messagesMap.values()).sort((a, b) => {
+          const aEnd = a.timespanEnd ?? "";
+          const bEnd = b.timespanEnd ?? "";
+          if (aEnd !== bEnd) return bEnd.localeCompare(aEnd);
+          const aCreated = a.createdAt ?? "";
+          const bCreated = b.createdAt ?? "";
+          return bCreated.localeCompare(aCreated);
+        });
       }
-    } else {
-      // No category filter - fetch all messages with timespan filter (server-side)
-      const snapshot = await messagesRef
-        .where("timespanEnd", ">=", cutoffDate)
-        .orderBy("timespanEnd", "desc")
-        .orderBy("createdAt", "desc")
-        .get();
+    } else if (hasCategoryFilter) {
+      // Only category filter
+      const realCategories = selectedCategories.filter(
+        (c) => c !== "uncategorized",
+      );
+      const includeUncategorized = selectedCategories.includes("uncategorized");
 
-      snapshot.forEach((doc) => {
-        allMessages.push(docToMessage(doc));
+      if (includeUncategorized && realCategories.length === 0) {
+        const docs = await db.messages.findMany({
+          where: [
+            { field: "timespanEnd", op: ">=", value: cutoffDate },
+          ],
+          orderBy: [{ field: "timespanEnd", direction: "desc" }],
+        });
+
+        allMessages = docs
+          .filter((doc) => {
+            const categories = doc.categories as string[] | undefined;
+            return (
+              !categories ||
+              (Array.isArray(categories) && categories.length === 0)
+            );
+          })
+          .map(recordToMessage);
+      } else {
+        const queryPromises: Promise<Record<string, unknown>[]>[] = [];
+
+        if (realCategories.length > 0) {
+          queryPromises.push(
+            db.messages.findMany({
+              where: [
+                { field: "categories", op: "array-contains-any", value: realCategories },
+                { field: "timespanEnd", op: ">=", value: cutoffDate },
+              ],
+              orderBy: [{ field: "timespanEnd", direction: "desc" }],
+            }),
+          );
+        }
+
+        if (includeUncategorized) {
+          queryPromises.push(
+            db.messages.findMany({
+              where: [
+                { field: "timespanEnd", op: ">=", value: cutoffDate },
+              ],
+              orderBy: [{ field: "timespanEnd", direction: "desc" }],
+            }),
+          );
+        }
+
+        const results = await Promise.all(queryPromises);
+        const messagesMap = new Map<string, Message>();
+
+        for (let i = 0; i < results.length; i++) {
+          const docs = results[i];
+          const isUncategorizedQuery =
+            includeUncategorized && i === results.length - 1;
+
+          for (const doc of docs) {
+            if (isUncategorizedQuery) {
+              const categories = doc.categories as string[] | undefined;
+              const isUncategorized =
+                !categories ||
+                (Array.isArray(categories) && categories.length === 0);
+              if (!isUncategorized) continue;
+            }
+
+            const docId = doc._id as string;
+            if (!messagesMap.has(docId)) {
+              messagesMap.set(docId, recordToMessage(doc));
+            }
+          }
+        }
+
+        allMessages = Array.from(messagesMap.values()).sort((a, b) => {
+          const aEnd = a.timespanEnd ?? "";
+          const bEnd = b.timespanEnd ?? "";
+          if (aEnd !== bEnd) return bEnd.localeCompare(aEnd);
+          const aCreated = a.createdAt ?? "";
+          const bCreated = b.createdAt ?? "";
+          return bCreated.localeCompare(aCreated);
+        });
+      }
+    } else if (hasSourceFilter) {
+      // Only source filter - use database-level filtering
+      const queryPromises: Promise<Record<string, unknown>[]>[] = [];
+
+      for (const source of validatedSources!) {
+        queryPromises.push(
+          db.messages.findMany({
+            where: [
+              { field: "source", op: "==", value: source },
+              { field: "timespanEnd", op: ">=", value: cutoffDate },
+            ],
+            orderBy: [{ field: "timespanEnd", direction: "desc" }],
+          }),
+        );
+      }
+
+      const results = await Promise.all(queryPromises);
+      const messagesMap = new Map<string, Message>();
+
+      for (const docs of results) {
+        for (const doc of docs) {
+          const docId = doc._id as string;
+          if (!messagesMap.has(docId)) {
+            messagesMap.set(docId, recordToMessage(doc));
+          }
+        }
+      }
+
+      allMessages = Array.from(messagesMap.values()).sort((a, b) => {
+        const aEnd = a.timespanEnd ?? "";
+        const bEnd = b.timespanEnd ?? "";
+        if (aEnd !== bEnd) return bEnd.localeCompare(aEnd);
+        const aCreated = a.createdAt ?? "";
+        const bCreated = b.createdAt ?? "";
+        return bCreated.localeCompare(aCreated);
       });
+    } else {
+      // No filters - fetch all messages with timespan filter
+      const docs = await db.messages.findMany({
+        where: [
+          { field: "timespanEnd", op: ">=", value: cutoffDate },
+        ],
+        orderBy: [
+          { field: "timespanEnd", direction: "desc" },
+          { field: "createdAt", direction: "desc" },
+        ],
+      });
+
+      allMessages = docs.map(recordToMessage);
     }
 
     // Include all messages with valid GeoJSON (no relevance filter needed - done in DB)
@@ -194,6 +340,9 @@ export async function GET(request: Request) {
         );
       });
     }
+
+    // Source filtering is now done at database level (above)
+    // No need for in-memory filtering
 
     // Simplify geometry to centroids for low zoom levels (for clustering)
     if (zoom !== undefined && zoom < CLUSTER_ZOOM_THRESHOLD) {

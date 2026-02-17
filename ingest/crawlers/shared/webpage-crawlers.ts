@@ -1,7 +1,7 @@
 import { parseBulgarianDate } from "./date-utils";
 import { createTurndownService } from "./markdown";
 import { Browser, Page } from "playwright";
-import type { Firestore } from "firebase-admin/firestore";
+import type { OboDb } from "@oboapp/db";
 import { PostLink } from "./types";
 import { launchBrowser } from "./browser";
 import { isUrlProcessed, saveSourceDocument } from "./firestore";
@@ -14,20 +14,24 @@ const turndownService = createTurndownService();
  * Build a SourceDocument from webpage content (HTML to Markdown conversion)
  * Used by WordPress-style crawlers like rayon-oborishte-bg and sofia-bg
  */
-export function buildWebPageSourceDocument(
-  url: string,
-  title: string,
-  dateText: string,
-  contentHtml: string,
-  sourceType: string,
-  customDateParser?: (dateText: string) => string,
-): {
+export function buildWebPageSourceDocument(options: {
+  url: string;
+  title: string;
+  dateText: string;
+  contentHtml: string;
+  sourceType: string;
+  locality: string;
+  customDateParser?: (dateText: string) => string;
+}): {
   url: string;
   title: string;
   datePublished: string;
   message: string;
   sourceType: string;
+  locality: string;
 } {
+  const { url, title, dateText, contentHtml, sourceType, locality, customDateParser } = options;
+
   if (!title) {
     throw new Error(`Failed to extract title from ${url}`);
   }
@@ -50,6 +54,7 @@ export function buildWebPageSourceDocument(
     datePublished,
     message,
     sourceType,
+    locality,
   };
 }
 
@@ -63,8 +68,9 @@ export async function processWordpressPost<
 >(
   browser: Browser,
   postLink: TPostLink,
-  adminDb: Firestore,
+  db: OboDb,
   sourceType: string,
+  locality: string,
   delayMs: number,
   extractPostDetails: (page: Page) => Promise<TDetails>,
   customDateParser?: (dateText: string) => string,
@@ -81,21 +87,22 @@ export async function processWordpressPost<
 
     const details = await extractPostDetails(page);
 
-    const postDetails = buildWebPageSourceDocument(
+    const postDetails = buildWebPageSourceDocument({
       url,
-      details.title,
-      details.dateText,
-      details.contentHtml,
+      title: details.title,
+      dateText: details.dateText,
+      contentHtml: details.contentHtml,
       sourceType,
+      locality,
       customDateParser,
-    );
+    });
 
     const sourceDoc = {
       ...postDetails,
       crawledAt: new Date(),
     };
 
-    await saveSourceDocument(sourceDoc, adminDb);
+    await saveSourceDocument(sourceDoc, db);
 
     logger.info("Successfully processed post", { title: title.substring(0, 60) });
   } catch (error) {
@@ -119,7 +126,7 @@ export async function crawlWordpressPage(options: {
   processPost: (
     browser: Browser,
     postLink: PostLink,
-    adminDb: Firestore,
+    db: OboDb,
   ) => Promise<void>;
   delayBetweenRequests?: number;
 }): Promise<void> {
@@ -133,7 +140,8 @@ export async function crawlWordpressPage(options: {
 
   logger.info("Starting crawler", { sourceType, indexUrl });
 
-  const { adminDb } = await import("@/lib/firebase-admin");
+  const { getDb } = await import("@/lib/db");
+  const db = await getDb();
 
   let browser: Browser | null = null;
 
@@ -160,13 +168,13 @@ export async function crawlWordpressPage(options: {
 
     for (const postLink of postLinks) {
       try {
-        const wasProcessed = await isUrlProcessed(postLink.url, adminDb);
+        const wasProcessed = await isUrlProcessed(postLink.url, db);
 
         if (wasProcessed) {
           skippedCount++;
           logger.info("Skipped already processed post", { title: postLink.title.substring(0, 60) });
         } else {
-          await processPost(browser, postLink, adminDb);
+          await processPost(browser, postLink, db);
           processedCount++;
         }
       } catch (error) {

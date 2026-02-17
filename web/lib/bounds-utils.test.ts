@@ -1,16 +1,25 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import {
-  SOFIA_BOUNDS,
+  BOUNDS,
+  getLocalityBounds,
+  getLocalityCenter,
   clampBounds,
   addBuffer,
   featureIntersectsBounds,
   type ViewportBounds,
 } from "./bounds-utils";
 
+// Set environment variable for tests
+beforeEach(() => {
+  process.env.NEXT_PUBLIC_LOCALITY = "bg.sofia";
+});
+
+const TEST_BOUNDS = BOUNDS["bg.sofia"];
+
 describe("bounds-utils", () => {
-  describe("SOFIA_BOUNDS", () => {
+  describe("BOUNDS registry", () => {
     it("should have correct Sofia boundaries", () => {
-      expect(SOFIA_BOUNDS).toEqual({
+      expect(TEST_BOUNDS).toEqual({
         south: 42.605,
         west: 23.188,
         north: 42.83,
@@ -19,8 +28,32 @@ describe("bounds-utils", () => {
     });
   });
 
+  describe("getLocalityBounds", () => {
+    it("should return bounds for the configured locality", () => {
+      const bounds = getLocalityBounds();
+      expect(bounds).toEqual(TEST_BOUNDS);
+    });
+
+    it("should throw error if environment variable not set", () => {
+      delete process.env.NEXT_PUBLIC_LOCALITY;
+      expect(() => getLocalityBounds()).toThrow("NEXT_PUBLIC_LOCALITY environment variable is required but not set");
+    });
+  });
+
+  describe("getLocalityCenter", () => {
+    it("should return center for the configured locality", () => {
+      const center = getLocalityCenter();
+      expect(center).toEqual({ lat: 42.6977, lng: 23.3219 });
+    });
+
+    it("should throw error if environment variable not set", () => {
+      delete process.env.NEXT_PUBLIC_LOCALITY;
+      expect(() => getLocalityCenter()).toThrow("NEXT_PUBLIC_LOCALITY environment variable is required but not set");
+    });
+  });
+
   describe("clampBounds", () => {
-    it("should not modify bounds already within Sofia", () => {
+    it("should not modify bounds already within locality", () => {
       const bounds: ViewportBounds = {
         north: 42.7,
         south: 42.65,
@@ -43,7 +76,7 @@ describe("bounds-utils", () => {
 
       const clamped = clampBounds(bounds);
 
-      expect(clamped.north).toBe(SOFIA_BOUNDS.north);
+      expect(clamped.north).toBe(TEST_BOUNDS.north);
       expect(clamped.south).toBe(bounds.south);
     });
 
@@ -57,7 +90,7 @@ describe("bounds-utils", () => {
 
       const clamped = clampBounds(bounds);
 
-      expect(clamped.south).toBe(SOFIA_BOUNDS.south);
+      expect(clamped.south).toBe(TEST_BOUNDS.south);
       expect(clamped.north).toBe(bounds.north);
     });
 
@@ -71,7 +104,7 @@ describe("bounds-utils", () => {
 
       const clamped = clampBounds(bounds);
 
-      expect(clamped.east).toBe(SOFIA_BOUNDS.east);
+      expect(clamped.east).toBe(TEST_BOUNDS.east);
       expect(clamped.west).toBe(bounds.west);
     });
 
@@ -85,7 +118,7 @@ describe("bounds-utils", () => {
 
       const clamped = clampBounds(bounds);
 
-      expect(clamped.west).toBe(SOFIA_BOUNDS.west);
+      expect(clamped.west).toBe(TEST_BOUNDS.west);
       expect(clamped.east).toBe(bounds.east);
     });
 
@@ -101,9 +134,9 @@ describe("bounds-utils", () => {
 
       // When completely outside, south clamps up and north clamps down
       // This results in inverted bounds (south > north)
-      expect(clamped.north).toBe(SOFIA_BOUNDS.north);
+      expect(clamped.north).toBe(TEST_BOUNDS.north);
       expect(clamped.south).toBe(44.0); // Can't clamp below original
-      expect(clamped.east).toBe(SOFIA_BOUNDS.east);
+      expect(clamped.east).toBe(TEST_BOUNDS.east);
       expect(clamped.west).toBe(24.0); // Can't clamp below original
     });
   });
@@ -153,11 +186,11 @@ describe("bounds-utils", () => {
 
       const buffered = addBuffer(bounds, 0.2);
 
-      // Should not exceed Sofia bounds
-      expect(buffered.north).toBeLessThanOrEqual(SOFIA_BOUNDS.north);
-      expect(buffered.south).toBeGreaterThanOrEqual(SOFIA_BOUNDS.south);
-      expect(buffered.east).toBeLessThanOrEqual(SOFIA_BOUNDS.east);
-      expect(buffered.west).toBeGreaterThanOrEqual(SOFIA_BOUNDS.west);
+      // Should not exceed locality bounds
+      expect(buffered.north).toBeLessThanOrEqual(TEST_BOUNDS.north);
+      expect(buffered.south).toBeGreaterThanOrEqual(TEST_BOUNDS.south);
+      expect(buffered.east).toBeLessThanOrEqual(TEST_BOUNDS.east);
+      expect(buffered.west).toBeGreaterThanOrEqual(TEST_BOUNDS.west);
     });
   });
 

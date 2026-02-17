@@ -80,6 +80,7 @@ describe("isMessageRelevant", () => {
     it("should be relevant if pin timespan ends after cutoff", () => {
       const message: Message = {
         text: "Test",
+        locality: "bg.sofia",
         createdAt: new Date("2025-12-01").toISOString(), // Old createdAt
         pins: [
           {
@@ -96,6 +97,7 @@ describe("isMessageRelevant", () => {
     it("should be relevant if street timespan ends after cutoff", () => {
       const message: Message = {
         text: "Test",
+        locality: "bg.sofia",
         createdAt: new Date("2025-12-01").toISOString(),
         pins: [],
         streets: [
@@ -114,7 +116,8 @@ describe("isMessageRelevant", () => {
     it("should be irrelevant if all timespans end before cutoff", () => {
       const message: Message = {
         text: "Test",
-        createdAt: "2025-12-01",
+        locality: "bg.sofia",
+      createdAt: "2025-12-01",
         pins: [
           {
             address: "Test St",
@@ -130,7 +133,8 @@ describe("isMessageRelevant", () => {
     it("should be relevant if at least one timespan is after cutoff", () => {
       const message: Message = {
         text: "Test",
-        createdAt: "2025-12-01",
+        locality: "bg.sofia",
+      createdAt: "2025-12-01",
         pins: [
           {
             address: "Test St 1",
@@ -150,7 +154,8 @@ describe("isMessageRelevant", () => {
     it("should fall back to createdAt when timespans have no end date", () => {
       const message: Message = {
         text: "Test",
-        createdAt: "2026-01-15", // Recent createdAt (used when timespans invalid)
+        locality: "bg.sofia",
+      createdAt: "2026-01-15", // Recent createdAt (used when timespans invalid)
         pins: [
           {
             address: "Test St",
@@ -167,7 +172,8 @@ describe("isMessageRelevant", () => {
     it("should fall back to createdAt when timespans have invalid end dates", () => {
       const message: Message = {
         text: "Test",
-        createdAt: "2026-01-15",
+        locality: "bg.sofia",
+      createdAt: "2026-01-15",
         pins: [
           {
             address: "Test St",
@@ -184,7 +190,8 @@ describe("isMessageRelevant", () => {
     it("should fall back to createdAt when ALL timespans are invalid", () => {
       const recentMessage: Message = {
         text: "Test",
-        createdAt: "2026-01-15", // Recent, should be used
+        locality: "bg.sofia",
+      createdAt: "2026-01-15", // Recent, should be used
         pins: [
           {
             address: "Test St 1",
@@ -205,7 +212,8 @@ describe("isMessageRelevant", () => {
     it("should NOT fall back to createdAt when at least one timespan is valid", () => {
       const message: Message = {
         text: "Test",
-        createdAt: "2026-01-15", // Recent, but ignored
+        locality: "bg.sofia",
+      createdAt: "2026-01-15", // Recent, but ignored
         pins: [
           {
             address: "Test St 1",
@@ -227,7 +235,8 @@ describe("isMessageRelevant", () => {
     it("should collect timespans from both pins and streets", () => {
       const message: Message = {
         text: "Test",
-        createdAt: "2025-12-01",
+        locality: "bg.sofia",
+      createdAt: "2025-12-01",
         pins: [
           {
             address: "Pin St",
@@ -253,7 +262,8 @@ describe("isMessageRelevant", () => {
     it("should be relevant if createdAt is after cutoff and no timespans", () => {
       const message: Message = {
         text: "Test",
-        createdAt: "2026-01-15",
+        locality: "bg.sofia",
+      createdAt: "2026-01-15",
       };
 
       expect(isMessageRelevant(message, cutoffDate)).toBe(true);
@@ -262,7 +272,8 @@ describe("isMessageRelevant", () => {
     it("should be irrelevant if createdAt is before cutoff and no timespans", () => {
       const message: Message = {
         text: "Test",
-        createdAt: "2026-01-01",
+        locality: "bg.sofia",
+      createdAt: "2026-01-01",
       };
 
       expect(isMessageRelevant(message, cutoffDate)).toBe(false);
@@ -271,7 +282,8 @@ describe("isMessageRelevant", () => {
     it("should use createdAt if pins and streets are empty", () => {
       const message: Message = {
         text: "Test",
-        createdAt: "2026-01-15",
+        locality: "bg.sofia",
+      createdAt: "2026-01-15",
         pins: [],
         streets: [],
       };
@@ -282,7 +294,8 @@ describe("isMessageRelevant", () => {
     it("should use createdAt if pins/streets have empty timespans arrays", () => {
       const message: Message = {
         text: "Test",
-        createdAt: "2026-01-15",
+        locality: "bg.sofia",
+      createdAt: "2026-01-15",
         pins: [{ address: "Test St", timespans: [] }],
         streets: [],
       };
@@ -295,7 +308,8 @@ describe("isMessageRelevant", () => {
     it("should handle message with no pins/streets", () => {
       const message: Message = {
         text: "Test",
-        createdAt: "2026-01-15",
+        locality: "bg.sofia",
+      createdAt: "2026-01-15",
       };
 
       expect(isMessageRelevant(message, cutoffDate)).toBe(true);
@@ -304,7 +318,8 @@ describe("isMessageRelevant", () => {
     it("should handle undefined pins and streets", () => {
       const message: Message = {
         text: "Test",
-        createdAt: "2026-01-15",
+        locality: "bg.sofia",
+      createdAt: "2026-01-15",
         pins: undefined as any,
         streets: undefined as any,
       };
@@ -315,7 +330,8 @@ describe("isMessageRelevant", () => {
     it("should handle createdAt as string", () => {
       const message: Message = {
         text: "Test",
-        createdAt: "2026-01-15T10:00:00Z",
+        locality: "bg.sofia",
+      createdAt: "2026-01-15T10:00:00Z",
       };
 
       expect(isMessageRelevant(message, cutoffDate)).toBe(true);
@@ -324,7 +340,8 @@ describe("isMessageRelevant", () => {
     it("should be relevant when timespan ends after cutoff (inclusive)", () => {
       const message: Message = {
         text: "Test",
-        createdAt: "2025-12-01", // Old createdAt
+        locality: "bg.sofia",
+      createdAt: "2025-12-01", // Old createdAt
         pins: [
           {
             address: "Test St",

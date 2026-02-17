@@ -80,7 +80,7 @@ Make sure to add your Google Maps API key to the `NEXT_PUBLIC_GOOGLE_MAPS_API_KE
 
 ```bash
 cd ingest
-pnpm crawl -- --source rayon-oborishte-bg --dry-run
+pnpm crawl --source rayon-oborishte-bg --dry-run
 ```
 
 **Run ingestion pipeline (mocked):**

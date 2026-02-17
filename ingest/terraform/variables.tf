@@ -56,3 +56,14 @@ variable "alert_email" {
   description = "Email address for pipeline failure alerts"
   type        = string
 }
+
+variable "locality" {
+  description = "Locality identifier for messages (e.g., bg.sofia)"
+  type        = string
+  default     = "bg.sofia"
+}
+
+variable "ci_service_account_email" {
+  description = "Email of the CI/CD service account that runs Terraform (needs workflows.admin to update workflow definitions)"
+  type        = string
+}

@@ -1,2 +1,3 @@
 // Vitest setup file for ingest pipeline
-// Add global test setup here if needed
+// Set default locality for tests
+process.env.LOCALITY = "bg.sofia";

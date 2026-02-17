@@ -11,6 +11,7 @@ import { logger } from "@/lib/logger";
 export { buildMessage } from "./formatters";
 
 const SOURCE_TYPE = "sofiyska-voda";
+const LOCALITY = "bg.sofia";
 const BASE_URL =
   "https://gispx.sofiyskavoda.bg/arcgis/rest/services/WSI_PUBLIC/InfoCenter_Public/MapServer";
 
@@ -215,6 +216,7 @@ export async function buildSourceDocument(
     message,
     markdownText: message, // Store markdown in markdownText field
     sourceType: SOURCE_TYPE,
+    locality: LOCALITY,
     crawledAt: new Date(),
     geoJson,
     categories: ["water"],
