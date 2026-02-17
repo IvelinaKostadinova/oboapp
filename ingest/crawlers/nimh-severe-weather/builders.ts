@@ -14,12 +14,22 @@ const WARNING_TYPE_LABELS: Record<WarningType, string> = {
 
 /**
  * Generate a content hash for deduplication
- * Hash changes when warning content changes (e.g., yellow → orange)
+ * Hash changes only when structured warning data changes (e.g., yellow → orange)
+ * and ignores free-form recommendation prose updates.
  */
 export function buildContentHash(data: WeatherPageData): string {
+  const sortedWarnings = [...data.sofiaWarnings].sort((a, b) => {
+    if (a.type !== b.type) {
+      return a.type.localeCompare(b.type);
+    }
+    if (a.level !== b.level) {
+      return a.level.localeCompare(b.level);
+    }
+    return a.notes.join(";").localeCompare(b.notes.join(";"));
+  });
+
   return createHash("sha256")
-    .update(data.recommendation)
-    .update(JSON.stringify(data.sofiaWarnings))
+    .update(JSON.stringify(sortedWarnings))
     .digest("hex")
     .substring(0, 12);
 }
