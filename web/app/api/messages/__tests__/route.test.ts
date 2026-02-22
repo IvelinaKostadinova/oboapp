@@ -22,12 +22,22 @@ vi.mock("@/lib/db", () => ({
                   return fieldValue >= clause.value;
                 case "==":
                   return fieldValue === clause.value;
+                case "in":
+                  return (
+                    Array.isArray(clause.value) &&
+                    clause.value.includes(fieldValue)
+                  );
                 case "array-contains-any":
                   return (
                     Array.isArray(fieldValue) &&
                     clause.value.some((v: any) =>
                       (fieldValue as unknown[]).includes(v),
                     )
+                  );
+                case "not-in":
+                  return (
+                    Array.isArray(clause.value) &&
+                    !clause.value.includes(fieldValue)
                   );
                 default:
                   return true;

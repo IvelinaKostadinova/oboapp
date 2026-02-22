@@ -13,6 +13,7 @@ import { recordToMessage } from "@/lib/doc-to-message";
 
 const DEFAULT_RELEVANCE_DAYS = 7;
 const CLUSTER_ZOOM_THRESHOLD = 15;
+const FIRESTORE_IN_OPERATOR_LIMIT = 10;
 
 type DbClient = Awaited<ReturnType<typeof getDb>>;
 type MessageRecord = Record<string, unknown>;
@@ -104,38 +105,145 @@ async function findRecentMessageDocs(
   });
 }
 
+function chunkArray<T>(items: T[], chunkSize: number): T[][] {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += chunkSize) {
+    chunks.push(items.slice(index, index + chunkSize));
+  }
+  return chunks;
+}
+
+async function findRecentMessageDocsBySources(
+  db: DbClient,
+  cutoffDate: Date,
+  sources: string[],
+): Promise<MessageRecord[]> {
+  if (sources.length === 0) {
+    return [];
+  }
+
+  const sourceChunks = chunkArray(sources, FIRESTORE_IN_OPERATOR_LIMIT);
+  const chunkQueries = sourceChunks.map((sourceChunk) =>
+    db.messages.findMany({
+      where: [
+        { field: "source", op: "in", value: sourceChunk },
+        { field: "timespanEnd", op: ">=", value: cutoffDate },
+      ],
+      orderBy: [{ field: "timespanEnd", direction: "desc" }],
+    }),
+  );
+
+  const chunkResults = await Promise.all(chunkQueries);
+  return chunkResults.flat();
+}
+
 async function findMessagesBySources(
   db: DbClient,
   cutoffDate: Date,
   sources: string[],
 ): Promise<Message[]> {
-  const queryPromises: Promise<MessageRecord[]>[] = [];
-
-  for (const source of sources) {
-    queryPromises.push(
-      db.messages.findMany({
-        where: [
-          { field: "source", op: "==", value: source },
-          { field: "timespanEnd", op: ">=", value: cutoffDate },
-        ],
-        orderBy: [{ field: "timespanEnd", direction: "desc" }],
-      }),
-    );
-  }
-
-  const results = await Promise.all(queryPromises);
+  const results = await findRecentMessageDocsBySources(db, cutoffDate, sources);
   const messagesMap = new Map<string, Message>();
 
-  for (const docs of results) {
-    for (const doc of docs) {
-      const docId = doc._id as string;
-      if (!messagesMap.has(docId)) {
-        messagesMap.set(docId, recordToMessage(doc));
-      }
+  for (const doc of results) {
+    const docId = doc._id as string;
+    if (!messagesMap.has(docId)) {
+      messagesMap.set(docId, recordToMessage(doc));
     }
   }
 
   return sortMessagesByTimespanAndCreated(Array.from(messagesMap.values()));
+}
+
+function toSourceList(sourceSet?: Set<string>): string[] {
+  return sourceSet ? Array.from(sourceSet) : [];
+}
+
+async function findUncategorizedDocs(
+  db: DbClient,
+  cutoffDate: Date,
+  sourceSet?: Set<string>,
+): Promise<MessageRecord[]> {
+  const sourceList = toSourceList(sourceSet);
+  const docs = sourceList.length
+    ? await findRecentMessageDocsBySources(db, cutoffDate, sourceList)
+    : await findRecentMessageDocs(db, cutoffDate);
+
+  return docs.filter((doc) => isUncategorizedDoc(doc));
+}
+
+function dedupeAndMapMessages(docs: MessageRecord[]): Message[] {
+  const messagesMap = new Map<string, Message>();
+
+  for (const doc of docs) {
+    const docId = doc._id as string;
+    if (!messagesMap.has(docId)) {
+      messagesMap.set(docId, recordToMessage(doc));
+    }
+  }
+
+  return Array.from(messagesMap.values());
+}
+
+function applyOptionalSourceSet(
+  docs: MessageRecord[],
+  sourceSet?: Set<string>,
+): MessageRecord[] {
+  if (!sourceSet) {
+    return docs;
+  }
+
+  return docs.filter((doc) => doc.source && sourceSet.has(doc.source as string));
+}
+
+function isInvalidSourceForFilter(
+  doc: MessageRecord,
+  sourceSet?: Set<string>,
+): boolean {
+  if (!sourceSet) {
+    return false;
+  }
+
+  return !doc.source || !sourceSet.has(doc.source as string);
+}
+
+async function buildCategoryQueryPlans(
+  db: DbClient,
+  cutoffDate: Date,
+  realCategories: string[],
+  includeUncategorized: boolean,
+  sourceSet?: Set<string>,
+): Promise<Array<{ uncategorizedOnly: boolean; docs: MessageRecord[] }>> {
+  const plans: Array<Promise<{ uncategorizedOnly: boolean; docs: MessageRecord[] }>> = [];
+
+  if (realCategories.length > 0) {
+    plans.push(
+      db.messages
+        .findMany({
+          where: [
+            {
+              field: "categories",
+              op: "array-contains-any",
+              value: realCategories,
+            },
+            { field: "timespanEnd", op: ">=", value: cutoffDate },
+          ],
+          orderBy: [{ field: "timespanEnd", direction: "desc" }],
+        })
+        .then((docs) => ({ uncategorizedOnly: false, docs })),
+    );
+  }
+
+  if (includeUncategorized) {
+    plans.push(
+      findUncategorizedDocs(db, cutoffDate, sourceSet).then((docs) => ({
+        uncategorizedOnly: true,
+        docs,
+      })),
+    );
+  }
+
+  return Promise.all(plans);
 }
 
 async function findMessagesByCategoryFilters(
@@ -150,59 +258,32 @@ async function findMessagesByCategoryFilters(
   const includeUncategorized = selectedCategories.includes("uncategorized");
 
   if (includeUncategorized && realCategories.length === 0) {
-    const docs = await findRecentMessageDocs(db, cutoffDate);
-
-    return docs
-      .filter((doc) => {
-        if (!isUncategorizedDoc(doc)) return false;
-        if (!sourceSet) return true;
-        return doc.source && sourceSet.has(doc.source as string);
-      })
-      .map(recordToMessage);
+    const uncategorizedDocs = await findUncategorizedDocs(
+      db,
+      cutoffDate,
+      sourceSet,
+    );
+    return dedupeAndMapMessages(uncategorizedDocs);
   }
-
-  const queryPlans: Array<{
-    uncategorizedOnly: boolean;
-    query: Promise<MessageRecord[]>;
-  }> = [];
-
-  if (realCategories.length > 0) {
-    queryPlans.push({
-      uncategorizedOnly: false,
-      query: db.messages.findMany({
-        where: [
-          {
-            field: "categories",
-            op: "array-contains-any",
-            value: realCategories,
-          },
-          { field: "timespanEnd", op: ">=", value: cutoffDate },
-        ],
-        orderBy: [{ field: "timespanEnd", direction: "desc" }],
-      }),
-    });
-  }
-
-  if (includeUncategorized) {
-    queryPlans.push({
-      uncategorizedOnly: true,
-      query: findRecentMessageDocs(db, cutoffDate),
-    });
-  }
-
-  const results = await Promise.all(queryPlans.map((plan) => plan.query));
+  const queryPlans = await buildCategoryQueryPlans(
+    db,
+    cutoffDate,
+    realCategories,
+    includeUncategorized,
+    sourceSet,
+  );
   const messagesMap = new Map<string, Message>();
 
-  for (let i = 0; i < results.length; i++) {
-    const docs = results[i];
-    const { uncategorizedOnly } = queryPlans[i];
+  for (const plan of queryPlans) {
+    const docs = applyOptionalSourceSet(plan.docs, sourceSet);
+    const { uncategorizedOnly } = plan;
 
     for (const doc of docs) {
       if (uncategorizedOnly && !isUncategorizedDoc(doc)) {
         continue;
       }
 
-      if (sourceSet && (!doc.source || !sourceSet.has(doc.source as string))) {
+      if (isInvalidSourceForFilter(doc, sourceSet)) {
         continue;
       }
 
