@@ -268,3 +268,136 @@ export function formatBulgarianDateTime(date: Date): string {
 
   return `${day}.${month}.${year} ${hour}:${minute}`;
 }
+
+const BULGARIAN_MONTH_TO_NUMBER: Record<string, number> = {
+  януари: 1,
+  февруари: 2,
+  март: 3,
+  април: 4,
+  май: 5,
+  юни: 6,
+  юли: 7,
+  август: 8,
+  септември: 9,
+  октомври: 10,
+  ноември: 11,
+  декември: 12,
+};
+
+function buildDate(year: number, month: number, day: number): Date {
+  const date = new Date(year, month - 1, day, 0, 0, 0, 0);
+
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    throw new Error(`Invalid date: ${day}.${month}.${year}`);
+  }
+
+  return date;
+}
+
+/**
+ * Parse Bulgarian date text into a date range.
+ * Supported formats:
+ * - 27.01.2026
+ * - 15-19.03.2026
+ * - 15.02-19.03.2026
+ * - 27 януари 2026
+ * - 27 януари (сряда) 2026
+ */
+export function parseBulgarianDateOrRange(dateText: string): { start: Date; end: Date } {
+  const normalized = dateText
+    .trim()
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\s+/g, " ");
+
+  // DD-DD.MM.YYYY
+  const sameMonthRange = normalized.match(/(\d{1,2})\s*-\s*(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);
+  if (sameMonthRange) {
+    const startDay = Number.parseInt(sameMonthRange[1], 10);
+    const endDay = Number.parseInt(sameMonthRange[2], 10);
+    const month = Number.parseInt(sameMonthRange[3], 10);
+    const yearRaw = Number.parseInt(sameMonthRange[4], 10);
+    const year = sameMonthRange[4].length === 2 ? 2000 + yearRaw : yearRaw;
+
+    return {
+      start: buildDate(year, month, startDay),
+      end: buildDate(year, month, endDay),
+    };
+  }
+
+  // DD.MM-DD.MM.YYYY
+  const crossMonthRange = normalized.match(/(\d{1,2})\.(\d{1,2})\s*-\s*(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);
+  if (crossMonthRange) {
+    const startDay = Number.parseInt(crossMonthRange[1], 10);
+    const startMonth = Number.parseInt(crossMonthRange[2], 10);
+    const endDay = Number.parseInt(crossMonthRange[3], 10);
+    const endMonth = Number.parseInt(crossMonthRange[4], 10);
+    const yearRaw = Number.parseInt(crossMonthRange[5], 10);
+    const year = crossMonthRange[5].length === 2 ? 2000 + yearRaw : yearRaw;
+
+    return {
+      start: buildDate(year, startMonth, startDay),
+      end: buildDate(year, endMonth, endDay),
+    };
+  }
+
+  // DD.MM.YYYY
+  const numericSingle = normalized.match(/(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);
+  if (numericSingle) {
+    const day = Number.parseInt(numericSingle[1], 10);
+    const month = Number.parseInt(numericSingle[2], 10);
+    const yearRaw = Number.parseInt(numericSingle[3], 10);
+    const year = numericSingle[3].length === 2 ? 2000 + yearRaw : yearRaw;
+    const date = buildDate(year, month, day);
+
+    return {
+      start: date,
+      end: date,
+    };
+  }
+
+  // DD <month> YYYY
+  const monthNameSingle = normalized.match(/(\d{1,2})\s+([а-я]+)\s+(\d{4})/);
+  if (monthNameSingle) {
+    const day = Number.parseInt(monthNameSingle[1], 10);
+    const monthName = monthNameSingle[2];
+    const year = Number.parseInt(monthNameSingle[3], 10);
+    const month = BULGARIAN_MONTH_TO_NUMBER[monthName];
+
+    if (!month) {
+      throw new Error(`Unsupported Bulgarian month: ${monthName}`);
+    }
+
+    const date = buildDate(year, month, day);
+    return {
+      start: date,
+      end: date,
+    };
+  }
+
+  throw new Error(`Unable to parse Bulgarian date text: ${dateText}`);
+}
+
+/**
+ * Returns true when reference date is within the date range (inclusive).
+ */
+export function isDateRelevant(
+  range: { start: Date; end: Date },
+  referenceDate: Date = new Date(),
+): boolean {
+  const reference = new Date(referenceDate);
+  reference.setHours(0, 0, 0, 0);
+
+  const start = new Date(range.start);
+  start.setHours(0, 0, 0, 0);
+
+  const end = new Date(range.end);
+  end.setHours(0, 0, 0, 0);
+
+  return reference >= start && reference <= end;
+}
