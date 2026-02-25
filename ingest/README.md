@@ -74,3 +74,11 @@ The system runs two automated pipelines via Cloud Scheduler:
 ## Deployment
 
 Dockerized for Google Cloud Run Jobs. See `Dockerfile` and `terraform/` directory.
+
+## Testing Toolchain Note
+
+`ingest/` currently pins `vitest@3.2.4` (with `vite@6`) while `web/` uses Vitest 4.
+
+Reason: in this workspace/runtime, `ingest` hit an `ERR_REQUIRE_ESM` startup failure with Vitest 4 + Vite 7 when loading `vitest.config.ts`. Pinning `ingest` to the Vitest 3 toolchain restores stable test execution (`pnpm test:run`) for crawler and pipeline tests.
+
+This is a temporary compatibility pin. We should align versions again once the workspace/runtime is upgraded or the upstream compatibility issue is resolved.

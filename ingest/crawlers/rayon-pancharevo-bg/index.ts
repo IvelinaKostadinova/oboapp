@@ -36,10 +36,6 @@ const processPost = (
     extractPostDetails,
   );
 
-function hasDateLikeText(text: string): boolean {
-  return /\d{1,2}\.\d{1,2}\.\d{2,4}|\d{1,2}\.\d{1,2}-\d{1,2}\.\d{1,2}\.\d{2,4}|\d{1,2}-\d{1,2}\.\d{1,2}\.\d{2,4}|\d{1,2}\s+[а-яА-Я]+(?:\s*\([^)]*\))?\s+\d{4}/.test(text);
-}
-
 export function extractDateCandidate(text: string): string | null {
   const normalized = text.replace(/\s+/g, " ").trim();
   const patterns = [
@@ -70,7 +66,7 @@ export async function crawl(): Promise<void> {
         const dateSource = `${link.date} ${link.title}`.trim();
         const dateCandidate = extractDateCandidate(dateSource);
 
-        if (!dateCandidate || !hasDateLikeText(dateCandidate)) {
+        if (!dateCandidate) {
           logger.warn("Could not extract date from post listing; keeping for downstream processing", {
             url: link.url,
             title: link.title.substring(0, 80),
