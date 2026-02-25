@@ -10,7 +10,11 @@ import {
   crawlWordpressPage,
   processWordpressPost,
 } from "../shared/webpage-crawlers";
-import { parseBulgarianDateOrRange, isDateRelevant } from "../shared/date-utils";
+import {
+  parseBulgarianDate,
+  parseBulgarianDateOrRange,
+  isDateRelevant,
+} from "../shared/date-utils";
 import { logger } from "@/lib/logger";
 
 dotenv.config({ path: resolve(process.cwd(), ".env.local") });
@@ -20,6 +24,17 @@ const INDEX_URL =
 const SOURCE_TYPE = "rayon-pancharevo-bg";
 const LOCALITY = "bg.sofia";
 const DELAY_BETWEEN_REQUESTS = 2000;
+
+export function parsePancharevoDateToIso(dateText: string): string {
+  const candidate = extractDateCandidate(dateText);
+
+  if (candidate) {
+    const range = parseBulgarianDateOrRange(candidate);
+    return range.start.toISOString();
+  }
+
+  return parseBulgarianDate(dateText);
+}
 
 const processPost = (
   browser: Browser,
@@ -34,6 +49,7 @@ const processPost = (
     LOCALITY,
     DELAY_BETWEEN_REQUESTS,
     extractPostDetails,
+    parsePancharevoDateToIso,
   );
 
 export function extractDateCandidate(text: string): string | null {

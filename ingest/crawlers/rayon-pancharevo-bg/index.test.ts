@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extractDateCandidate } from "./index";
+import { extractDateCandidate, parsePancharevoDateToIso } from "./index";
 
 describe("rayon-pancharevo-bg/index date candidate extraction", () => {
   it("extracts month-name date with day-of-week", () => {
@@ -30,5 +30,29 @@ describe("rayon-pancharevo-bg/index date candidate extraction", () => {
     const input = "Информация за ВиК дейности без посочена дата";
 
     expect(extractDateCandidate(input)).toBeNull();
+  });
+});
+
+describe("rayon-pancharevo-bg/index date parser", () => {
+  it("parses month-name date text to ISO", () => {
+    const iso = parsePancharevoDateToIso(
+      "Предстоящо спиране на водоподаването на 27 януари (вторник) 2026 г. в с. Лозен",
+    );
+    const parsed = new Date(iso);
+
+    expect(parsed.getFullYear()).toBe(2026);
+    expect(parsed.getMonth()).toBe(0);
+    expect(parsed.getDate()).toBe(27);
+  });
+
+  it("parses range date text and uses range start", () => {
+    const iso = parsePancharevoDateToIso(
+      "Ремонтни дейности в периода 24-26.02.2026 г. в района",
+    );
+    const parsed = new Date(iso);
+
+    expect(parsed.getFullYear()).toBe(2026);
+    expect(parsed.getMonth()).toBe(1);
+    expect(parsed.getDate()).toBe(24);
   });
 });
