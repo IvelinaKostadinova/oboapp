@@ -5,7 +5,7 @@ describe("rayon-pancharevo-bg/index date candidate extraction", () => {
   it("extracts month-name date with day-of-week", () => {
     const input = "Предстоящо спиране на водоподаването на 27 януари (вторник) 2026 г. в с. Лозен";
 
-    expect(extractDateCandidate(input)).toBe("27 януари (вторник) 2026");
+    expect(extractDateCandidate(input)).toBe("27 януари (вторник) 2026 г.");
   });
 
   it("extracts same-month range", () => {

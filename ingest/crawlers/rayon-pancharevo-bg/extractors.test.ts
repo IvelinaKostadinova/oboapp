@@ -16,7 +16,7 @@ describe("rayon-pancharevo-bg/extractors", () => {
     it("extracts valid pancharevo post links", async () => {
       const mockEvaluate = vi.fn().mockResolvedValue([
         {
-          url: "https://www.pancharevo.org/ремонт-на-улица",
+          url: "https://www.pancharevo.org/ремонти-и-инфраструктура/2300-ремонт-на-улица",
           title: "Ремонт на улица",
           date: "25.02.2026",
         },
@@ -57,7 +57,7 @@ describe("rayon-pancharevo-bg/extractors", () => {
     it("accepts numeric ID posts", async () => {
       const mockEvaluate = vi.fn().mockResolvedValue([
         {
-          url: "https://www.pancharevo.org/21862-2/",
+          url: "https://www.pancharevo.org/ремонти-и-инфраструктура/21862-2/",
           title: "Инфраструктурни дейности",
           date: "24.02.2026",
         },

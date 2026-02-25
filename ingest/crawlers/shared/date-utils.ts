@@ -315,21 +315,6 @@ export function parseBulgarianDateOrRange(dateText: string): { start: Date; end:
     .replace(/\([^)]*\)/g, " ")
     .replace(/\s+/g, " ");
 
-  // DD-DD.MM.YYYY
-  const sameMonthRange = normalized.match(/(\d{1,2})\s*-\s*(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);
-  if (sameMonthRange) {
-    const startDay = Number.parseInt(sameMonthRange[1], 10);
-    const endDay = Number.parseInt(sameMonthRange[2], 10);
-    const month = Number.parseInt(sameMonthRange[3], 10);
-    const yearRaw = Number.parseInt(sameMonthRange[4], 10);
-    const year = sameMonthRange[4].length === 2 ? 2000 + yearRaw : yearRaw;
-
-    return {
-      start: buildDate(year, month, startDay),
-      end: buildDate(year, month, endDay),
-    };
-  }
-
   // DD.MM-DD.MM.YYYY
   const crossMonthRange = normalized.match(/(\d{1,2})\.(\d{1,2})\s*-\s*(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);
   if (crossMonthRange) {
@@ -343,6 +328,21 @@ export function parseBulgarianDateOrRange(dateText: string): { start: Date; end:
     return {
       start: buildDate(year, startMonth, startDay),
       end: buildDate(year, endMonth, endDay),
+    };
+  }
+
+  // DD-DD.MM.YYYY
+  const sameMonthRange = normalized.match(/(\d{1,2})\s*-\s*(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);
+  if (sameMonthRange) {
+    const startDay = Number.parseInt(sameMonthRange[1], 10);
+    const endDay = Number.parseInt(sameMonthRange[2], 10);
+    const month = Number.parseInt(sameMonthRange[3], 10);
+    const yearRaw = Number.parseInt(sameMonthRange[4], 10);
+    const year = sameMonthRange[4].length === 2 ? 2000 + yearRaw : yearRaw;
+
+    return {
+      start: buildDate(year, month, startDay),
+      end: buildDate(year, month, endDay),
     };
   }
 

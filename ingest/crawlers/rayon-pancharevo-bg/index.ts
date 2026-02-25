@@ -37,16 +37,16 @@ const processPost = (
   );
 
 function hasDateLikeText(text: string): boolean {
-  return /\d{1,2}\.\d{1,2}\.\d{2,4}|\d{1,2}-\d{1,2}\.\d{1,2}\.\d{2,4}|\d{1,2}\s+[а-яА-Я]+\s+\d{4}/.test(text);
+  return /\d{1,2}\.\d{1,2}\.\d{2,4}|\d{1,2}\.\d{1,2}-\d{1,2}\.\d{1,2}\.\d{2,4}|\d{1,2}-\d{1,2}\.\d{1,2}\.\d{2,4}|\d{1,2}\s+[а-яА-Я]+(?:\s*\([^)]*\))?\s+\d{4}/.test(text);
 }
 
 export function extractDateCandidate(text: string): string | null {
   const normalized = text.replace(/\s+/g, " ").trim();
   const patterns = [
-    /(\d{1,2}\s*-\s*\d{1,2}\.\d{1,2}\.\d{2,4})/i,
     /(\d{1,2}\.\d{1,2}\s*-\s*\d{1,2}\.\d{1,2}\.\d{2,4})/i,
+    /(\d{1,2}\s*-\s*\d{1,2}\.\d{1,2}\.\d{2,4})/i,
     /(\d{1,2}\.\d{1,2}\.\d{2,4})/i,
-    /(\d{1,2}\s+[а-яА-Я]+(?:\s*\([^)]*\))?\s+\d{4})/i,
+    /(\d{1,2}\s+[а-яА-Я]+(?:\s*\([^)]*\))?\s+\d{4}(?:\s*г\.)?)/i,
   ];
 
   for (const pattern of patterns) {
