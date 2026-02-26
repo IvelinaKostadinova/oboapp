@@ -16,8 +16,8 @@
   },
   "scripts": {
     "build": "tsc -p .",
-    "test": "vitest",
-    "test:run": "vitest run",
+    "test": "vitest --config vitest.config.mts",
+    "test:run": "vitest run --config vitest.config.mts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },
