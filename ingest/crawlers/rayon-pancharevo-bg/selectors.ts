@@ -11,10 +11,11 @@ export const SELECTORS = {
     POST_TITLE: "h2[itemprop='name'], h2, h3, .entry-title, .post-title",
   },
   POST: {
-    // Real structure: article.item-page with itemprop markers
+    // Prefer item-page scoped content; then fallback to generic article body/main containers
     CONTENT: "article.item-page [itemprop='articleBody'], [itemprop='articleBody'], article.item-page, main",
-    TITLE: "article.item-page h2[itemprop='name'], h1, h2[itemprop='name'], .entry-title, .post-title",
+    // Prefer item-page title first; then generic headings and common title classes
+    TITLE: "article.item-page h2[itemprop='name'], h1, .entry-title, .post-title",
     // No explicit date node in post header; fallback extraction uses title/body text
-    DATE: "article.item-page [itemprop='articleBody'] p:first-child, [itemprop='articleBody'] p:first-child, .article-info, time",
+    DATE: "article.item-page [itemprop='articleBody'] p:first-child, .article-info, time",
   },
 } as const;
