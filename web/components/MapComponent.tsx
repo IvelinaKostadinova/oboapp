@@ -10,6 +10,7 @@ import React, {
 import { GoogleMap, Circle } from "@react-google-maps/api";
 import { Message, Interest } from "@/lib/types";
 import { getLocalityBounds, getLocalityCenter } from "@/lib/bounds-utils";
+import { roundCoordinate } from "@oboapp/shared";
 import GeoJSONLayer from "./GeoJSONLayer";
 import InterestCircles from "./InterestCircles";
 import InterestTargetMode from "./InterestTargetMode";
@@ -219,8 +220,8 @@ export default function MapComponent({
     const center = mapRef.current.getCenter();
     if (!center) return;
     latestCenterRef.current = {
-      lat: center.lat(),
-      lng: center.lng(),
+      lat: roundCoordinate(center.lat()),
+      lng: roundCoordinate(center.lng()),
     };
   }, []);
 
@@ -237,10 +238,10 @@ export default function MapComponent({
     const sw = bounds.getSouthWest();
 
     onBoundsChanged({
-      north: ne.lat(),
-      south: sw.lat(),
-      east: ne.lng(),
-      west: sw.lng(),
+      north: roundCoordinate(ne.lat()),
+      south: roundCoordinate(sw.lat()),
+      east: roundCoordinate(ne.lng()),
+      west: roundCoordinate(sw.lng()),
       zoom,
     });
   }, [onBoundsChanged]);

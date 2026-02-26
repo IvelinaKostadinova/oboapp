@@ -1,5 +1,6 @@
 import center from "@turf/center";
 import { lineString, polygon } from "@turf/helpers";
+import { roundCoordinate } from "@oboapp/shared";
 import type { GeoJSONGeometry, GeoJSONFeatureCollection } from "@/lib/types";
 
 /**
@@ -203,8 +204,10 @@ export const getFeaturesCentroid = (
 
   if (centroids.length === 0) return null;
 
-  const avgLat = centroids.reduce((sum, c) => sum + c.lat, 0) / centroids.length;
-  const avgLng = centroids.reduce((sum, c) => sum + c.lng, 0) / centroids.length;
+  const avgLat =
+    centroids.reduce((sum, c) => sum + c.lat, 0) / centroids.length;
+  const avgLng =
+    centroids.reduce((sum, c) => sum + c.lng, 0) / centroids.length;
 
-  return { lat: avgLat, lng: avgLng };
+  return { lat: roundCoordinate(avgLat), lng: roundCoordinate(avgLng) };
 };

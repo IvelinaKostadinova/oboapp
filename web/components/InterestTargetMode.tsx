@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { roundCoordinate } from "@oboapp/shared";
 import { trackEvent, trackEventDebounced } from "@/lib/analytics";
 import { colors, borderRadius, zIndex } from "@/lib/colors";
 import { buttonStyles, buttonSizes } from "@/lib/theme";
@@ -75,7 +76,10 @@ export default function InterestTargetMode({
       // Clicking the circle repositions it
       circleRef.current.addListener("click", (e: google.maps.MapMouseEvent) => {
         if (e.latLng) {
-          setCurrentCenter({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+          setCurrentCenter({
+            lat: roundCoordinate(e.latLng.lat()),
+            lng: roundCoordinate(e.latLng.lng()),
+          });
         }
       });
     } else {
@@ -110,8 +114,8 @@ export default function InterestTargetMode({
       const center = map.getCenter();
       if (center) {
         setCurrentCenter({
-          lat: center.lat(),
-          lng: center.lng(),
+          lat: roundCoordinate(center.lat()),
+          lng: roundCoordinate(center.lng()),
         });
       }
     }
@@ -126,8 +130,8 @@ export default function InterestTargetMode({
       (e: google.maps.MapMouseEvent) => {
         if (e.latLng) {
           setCurrentCenter({
-            lat: e.latLng.lat(),
-            lng: e.latLng.lng(),
+            lat: roundCoordinate(e.latLng.lat()),
+            lng: roundCoordinate(e.latLng.lng()),
           });
         }
       },

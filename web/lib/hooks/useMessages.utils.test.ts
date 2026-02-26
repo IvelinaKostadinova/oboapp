@@ -24,7 +24,7 @@ describe("useMessages.utils", () => {
       const url = buildMessagesUrl(bounds);
 
       expect(url).toBe(
-        "/api/messages?north=42.7&south=42.65&east=23.4&west=23.3"
+        "/api/messages?north=42.7&south=42.65&east=23.4&west=23.3",
       );
     });
 
@@ -85,6 +85,22 @@ describe("useMessages.utils", () => {
 
       // Should be a valid URL
       expect(() => new URL(url, "http://localhost")).not.toThrow();
+    });
+
+    it("should round coordinates to 6 decimal places", () => {
+      const bounds = {
+        north: 42.6847955120577,
+        south: 42.6817314501631,
+        east: 23.268037068470008,
+        west: 23.263353931530006,
+      };
+
+      const url = buildMessagesUrl(bounds);
+
+      expect(url).toContain("north=42.684796");
+      expect(url).toContain("south=42.681731");
+      expect(url).toContain("east=23.268037");
+      expect(url).toContain("west=23.263354");
     });
 
     it("should include all four bounds parameters", () => {
