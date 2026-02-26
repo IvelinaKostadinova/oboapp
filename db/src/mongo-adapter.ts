@@ -10,7 +10,6 @@ import {
   type Filter,
   type Sort,
   type Document,
-  type WithId,
   type OptionalUnlessRequiredId,
   MongoServerError,
 } from "mongodb";
