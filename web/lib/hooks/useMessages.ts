@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { Message } from "@/lib/types";
 import { buildMessagesUrl } from "./useMessages.utils";
 import { debounce } from "@/lib/debounce";
@@ -58,17 +58,17 @@ export function useMessages() {
         // Build URL with optional categories and sources
         let url = buildMessagesUrl(bounds);
         const params = new URLSearchParams();
-        
+
         if (categories && categories.size > 0) {
           const categoriesParam = Array.from(categories).join(",");
           params.set("categories", categoriesParam);
         }
-        
+
         if (sources && sources.size > 0) {
           const sourcesParam = Array.from(sources).join(",");
           params.set("sources", sourcesParam);
         }
-        
+
         const queryString = params.toString();
         if (queryString) {
           url = `${url}${url.includes("?") ? "&" : "?"}${queryString}`;
@@ -103,9 +103,27 @@ export function useMessages() {
     [],
   );
 
+  // Ref to suppress viewport refetch during programmatic map moves (e.g., centering on selected message)
+  const suppressBoundsChangeRef = useRef(false);
+
+  // Called before programmatic map moves to prevent the resulting bounds change from triggering a refetch.
+  // Auto-clears after 500ms (slightly longer than the 300ms debounce) in case no bounds change fires.
+  const suppressNextViewportFetch = useCallback(() => {
+    suppressBoundsChangeRef.current = true;
+    setTimeout(() => {
+      suppressBoundsChangeRef.current = false;
+    }, 500);
+  }, []);
+
   // Handle map bounds change - debounced at 300ms
   const [handleBoundsChanged] = useState(() =>
-    debounce((bounds: ViewportBounds) => setViewportBounds(bounds), 300),
+    debounce((bounds: ViewportBounds) => {
+      if (suppressBoundsChangeRef.current) {
+        suppressBoundsChangeRef.current = false;
+        return;
+      }
+      setViewportBounds(bounds);
+    }, 300),
   );
 
   // Cleanup debounced function on unmount
@@ -146,6 +164,7 @@ export function useMessages() {
     isLoading,
     error,
     handleBoundsChanged,
+    suppressNextViewportFetch,
     setSelectedCategories,
     setSelectedSources,
   };

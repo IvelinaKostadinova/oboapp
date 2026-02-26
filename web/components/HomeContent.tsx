@@ -89,6 +89,7 @@ export default function HomeContent() {
     isLoading,
     error,
     handleBoundsChanged,
+    suppressNextViewportFetch,
     setSelectedCategories,
     setSelectedSources,
   } = useMessages();
@@ -221,10 +222,10 @@ export default function HomeContent() {
     return null;
   }, [messageId, messages]);
 
-  // Fetch message by ID from API if not found in viewport (e.g., shared link)
+  // Fetch message by ID from API when not already fetched (e.g., shared link, or message outside viewport)
   useEffect(() => {
-    // Don't fetch if: no messageId, already in viewport, or invalid messageId
-    if (!messageId || viewportMatch || !isValidMessageId(messageId)) {
+    // Don't fetch if: no messageId or invalid messageId
+    if (!messageId || !isValidMessageId(messageId)) {
       return;
     }
 
@@ -252,7 +253,7 @@ export default function HomeContent() {
     return () => {
       cancelled = true;
     };
-  }, [messageId, viewportMatch, fetchedMessage]);
+  }, [messageId, fetchedMessage]);
 
   // Derive selected message: use viewport match or fetched message (only if ID matches current messageId)
   const selectedMessage = useMemo(() => {
@@ -347,10 +348,17 @@ export default function HomeContent() {
 
     const centroid = getFeaturesCentroid(selectedMessage.geoJson);
     if (centroid) {
+      suppressNextViewportFetch();
       handleAddressClick(centroid.lat, centroid.lng);
       lastCenteredMessageIdRef.current = selectedMessage.id;
     }
-  }, [selectedMessage, handleAddressClick, centerMapFn, mapInstance]);
+  }, [
+    selectedMessage,
+    handleAddressClick,
+    centerMapFn,
+    mapInstance,
+    suppressNextViewportFetch,
+  ]);
 
   // Reset centered message tracking when selection is cleared
   useEffect(() => {
@@ -501,7 +509,7 @@ export default function HomeContent() {
 
       {/* Message Detail View */}
       <MessageDetailView
-        key={selectedMessage?.id ?? "no-message"}
+        key={messageId ?? "no-message"}
         message={selectedMessage}
         onClose={handleCloseDetail}
         onAddressClick={handleAddressClick}
