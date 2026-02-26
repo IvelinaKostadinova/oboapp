@@ -1,5 +1,20 @@
 import { logger } from "@/lib/logger";
 
+const BULGARIAN_MONTH_TO_NUMBER: Record<string, number> = {
+  януари: 1,
+  февруари: 2,
+  март: 3,
+  април: 4,
+  май: 5,
+  юни: 6,
+  юли: 7,
+  август: 8,
+  септември: 9,
+  октомври: 10,
+  ноември: 11,
+  декември: 12,
+};
+
 /**
  * Parse Bulgarian date format (DD.MM.YYYY, DD.MM.YY, or DD/MM/YYYY) to ISO string
  * Supports both 2-digit (YY) and 4-digit (YYYY) years
@@ -180,22 +195,6 @@ export function parseShortBulgarianDateTime(
  */
 export function parseBulgarianMonthDate(dateStr: string): string {
   try {
-    // Month name mapping (case-insensitive)
-    const monthMap: Record<string, string> = {
-      януари: "01",
-      февруари: "02",
-      март: "03",
-      април: "04",
-      май: "05",
-      юни: "06",
-      юли: "07",
-      август: "08",
-      септември: "09",
-      октомври: "10",
-      ноември: "11",
-      декември: "12",
-    };
-
     // Clean and normalize the input
     const cleaned = dateStr.trim();
 
@@ -209,7 +208,7 @@ export function parseBulgarianMonthDate(dateStr: string): string {
 
     const [, day, monthName, year] = match;
     const monthLower = monthName.toLowerCase();
-    const month = monthMap[monthLower];
+    const month = BULGARIAN_MONTH_TO_NUMBER[monthLower];
 
     if (!month) {
       logger.warn("Unknown Bulgarian month name, using current date", { monthName });
@@ -219,7 +218,7 @@ export function parseBulgarianMonthDate(dateStr: string): string {
     // Create date in local timezone (assumed to be Europe/Sofia)
     const date = new Date(
       Number.parseInt(year, 10),
-      Number.parseInt(month, 10) - 1, // 0-indexed months
+      month - 1, // 0-indexed months
       Number.parseInt(day, 10),
       0, // hour
       0, // minute
@@ -234,7 +233,7 @@ export function parseBulgarianMonthDate(dateStr: string): string {
 
     // Verify the parsed date matches input (catches invalid dates like Feb 31)
     const parsedDay = Number.parseInt(day, 10);
-    const parsedMonth = Number.parseInt(month, 10) - 1; // 0-indexed
+    const parsedMonth = month - 1; // 0-indexed
     const parsedYear = Number.parseInt(year, 10);
 
     if (
@@ -268,21 +267,6 @@ export function formatBulgarianDateTime(date: Date): string {
 
   return `${day}.${month}.${year} ${hour}:${minute}`;
 }
-
-const BULGARIAN_MONTH_TO_NUMBER: Record<string, number> = {
-  януари: 1,
-  февруари: 2,
-  март: 3,
-  април: 4,
-  май: 5,
-  юни: 6,
-  юли: 7,
-  август: 8,
-  септември: 9,
-  октомври: 10,
-  ноември: 11,
-  декември: 12,
-};
 
 function buildDate(year: number, month: number, day: number): Date {
   const date = new Date(year, month - 1, day, 0, 0, 0, 0);
