@@ -9,7 +9,9 @@ const eslintConfig = [
   {
     languageOptions: {
       parserOptions: {
-        projectService: true,
+        projectService: {
+          allowDefaultProject: ["src/*.test.ts"],
+        },
         tsconfigRootDir: __dirname,
       },
     },
