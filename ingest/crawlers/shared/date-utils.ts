@@ -384,7 +384,25 @@ export function parseBulgarianDateOrRange(dateText: string): { start: Date; end:
 }
 
 /**
- * Returns true when reference date is within the date range (inclusive).
+ * Check whether a given reference date falls within a date range (inclusive).
+ *
+ * Both the range boundaries and the reference date are normalized to midnight,
+ * so only the calendar date is compared (time of day is ignored).
+ *
+ * @param range - The date range to check against, with `start` and `end` dates.
+ * @param referenceDate - The date to test for relevance. Defaults to the current date.
+ * @returns `true` if the normalized reference date is between `range.start` and `range.end`
+ * (inclusive), otherwise `false`.
+ *
+ * @example
+ * const range = { start: new Date("2026-03-15"), end: new Date("2026-03-19") };
+ * isDateRelevant(range, new Date("2026-03-17")); // true
+ * isDateRelevant(range, new Date("2026-03-20")); // false
+ *
+ * @example
+ * // Using the result of parseBulgarianDateOrRange
+ * const dateRange = parseBulgarianDateOrRange("15-19.03.2026");
+ * isDateRelevant(dateRange); // uses today's date as the reference
  */
 export function isDateRelevant(
   range: { start: Date; end: Date },
