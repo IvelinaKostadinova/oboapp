@@ -10,6 +10,7 @@ import {
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { useInterestManagement } from "./useInterestManagement";
 import type { Interest } from "@/lib/types";
+import { DEFAULT_ZONE_COLOR } from "@/lib/zoneTypes";
 
 type CenterMapFn = (
   lat: number,
@@ -38,7 +39,11 @@ describe("useInterestManagement", () => {
   let centerMapFn: Mock<CenterMapFn>;
   let mapInstance: google.maps.Map | null;
   let addInterest: Mock<
-    (coordinates: { lat: number; lng: number }, radius: number) => Promise<void>
+    (
+      coordinates: { lat: number; lng: number },
+      radius: number,
+      metadata?: { label?: string; color?: string },
+    ) => Promise<void>
   >;
   let updateInterest: Mock<
     (
@@ -113,6 +118,7 @@ describe("useInterestManagement", () => {
       );
 
       expect(result.current.targetMode).toEqual({ active: false });
+      expect(result.current.pendingNewInterest).toBeNull();
       expect(result.current.selectedInterest).toBeNull();
       expect(result.current.interestMenuPosition).toBeNull();
     });
@@ -214,11 +220,13 @@ describe("useInterestManagement", () => {
       expect(centerMapFn).toHaveBeenCalledWith(42.7, 23.3, 17, {
         animate: false,
       });
-      expect(result.current.targetMode).toEqual({
-        active: true,
-        initialRadius: 500,
-        editingInterestId: "test-id",
-      });
+      expect(result.current.targetMode).toEqual(
+        expect.objectContaining({
+          active: true,
+          initialRadius: 500,
+          editingInterestId: "test-id",
+        }),
+      );
       expect(result.current.interestMenuPosition).toBeNull();
       expect(result.current.selectedInterest).toBeNull();
       expect(trackEvent).toHaveBeenCalledWith({
@@ -228,6 +236,61 @@ describe("useInterestManagement", () => {
           current_radius: 500,
         },
       });
+    });
+
+    it("should move a provided interest without requiring prior selection", () => {
+      const { result } = renderHook(() =>
+        useInterestManagement(
+          centerMapFn,
+          mapInstance,
+          addInterest,
+          updateInterest,
+          deleteInterest,
+        ),
+      );
+
+      const mockInterest = createMockInterest({ id: "from-list" });
+
+      act(() => {
+        result.current.handleMoveInterest(mockInterest);
+      });
+
+      expect(centerMapFn).toHaveBeenCalledWith(42.7, 23.3, 17, {
+        animate: false,
+      });
+      expect(result.current.targetMode).toEqual(
+        expect.objectContaining({
+          active: true,
+          editingInterestId: "from-list",
+        }),
+      );
+    });
+
+    it("should not crash when moving interest with invalid coordinates", () => {
+      const { result } = renderHook(() =>
+        useInterestManagement(
+          centerMapFn,
+          mapInstance,
+          addInterest,
+          updateInterest,
+          deleteInterest,
+        ),
+      );
+
+      const invalidInterest = {
+        ...createMockInterest({ id: "invalid-coordinates" }),
+        coordinates: undefined,
+      } as unknown as Interest;
+
+      act(() => {
+        result.current.handleMoveInterest(invalidInterest);
+      });
+
+      expect(centerMapFn).not.toHaveBeenCalled();
+      expect(result.current.targetMode.active).toBe(false);
+      expect(mockAlert).toHaveBeenCalledWith(
+        "Не успях да преместя зоната. Опитай пак.",
+      );
     });
   });
 
@@ -283,6 +346,28 @@ describe("useInterestManagement", () => {
           radius: 500,
         },
       });
+    });
+
+    it("should delete a provided interest without requiring prior selection", async () => {
+      const { result } = renderHook(() =>
+        useInterestManagement(
+          centerMapFn,
+          mapInstance,
+          addInterest,
+          updateInterest,
+          deleteInterest,
+        ),
+      );
+
+      const mockInterest = createMockInterest({ id: "from-list-delete" });
+
+      await act(async () => {
+        await result.current.handleDeleteInterest(mockInterest);
+      });
+
+      expect(deleteInterest).toHaveBeenCalledWith("from-list-delete");
+      expect(result.current.selectedInterest).toBeNull();
+      expect(result.current.interestMenuPosition).toBeNull();
     });
 
     it("should handle 404 error gracefully and reload", async () => {
@@ -360,16 +445,18 @@ describe("useInterestManagement", () => {
         result.current.handleStartAddInterest();
       });
 
-      expect(result.current.targetMode).toEqual({
-        active: true,
-        initialRadius: 500,
-        editingInterestId: null,
-      });
+      expect(result.current.targetMode).toEqual(
+        expect.objectContaining({
+          active: true,
+          initialRadius: 500,
+          editingInterestId: null,
+        }),
+      );
     });
   });
 
   describe("handleSaveInterest", () => {
-    it("should add new interest when not editing", async () => {
+    it("should store pending selection when not editing", async () => {
       const { result } = renderHook(() =>
         useInterestManagement(
           centerMapFn,
@@ -392,13 +479,17 @@ describe("useInterestManagement", () => {
       });
 
       await waitFor(() => {
-        expect(addInterest).toHaveBeenCalledWith(coordinates, radius);
+        expect(result.current.pendingNewInterest).toEqual({
+          coordinates,
+          radius,
+        });
       });
 
       await waitFor(() => {
         expect(result.current.targetMode.active).toBe(false);
       });
 
+      expect(addInterest).not.toHaveBeenCalled();
       expect(updateInterest).not.toHaveBeenCalled();
     });
 
@@ -444,37 +535,6 @@ describe("useInterestManagement", () => {
       expect(addInterest).not.toHaveBeenCalled();
     });
 
-    it("should show alert when adding interest fails", async () => {
-      addInterest.mockRejectedValue(new Error("Failed to add"));
-
-      const { result } = renderHook(() =>
-        useInterestManagement(
-          centerMapFn,
-          mapInstance,
-          addInterest,
-          updateInterest,
-          deleteInterest,
-        ),
-      );
-
-      act(() => {
-        result.current.handleStartAddInterest();
-      });
-
-      const coordinates = { lat: 42.7, lng: 23.3 };
-      const radius = 500;
-
-      act(() => {
-        result.current.handleSaveInterest(coordinates, radius);
-      });
-
-      await waitFor(() => {
-        expect(mockAlert).toHaveBeenCalledWith(
-          "Не успях да запазя зоната. Опитай пак.",
-        );
-      });
-    });
-
     it("should show alert when updating interest fails", async () => {
       updateInterest.mockRejectedValue(new Error("Failed to update"));
 
@@ -503,6 +563,105 @@ describe("useInterestManagement", () => {
 
       act(() => {
         result.current.handleSaveInterest(newCoordinates, newRadius);
+      });
+
+      await waitFor(() => {
+        expect(mockAlert).toHaveBeenCalledWith(
+          "Не успях да запазя зоната. Опитай пак.",
+        );
+      });
+    });
+  });
+
+  describe("handleConfirmPendingInterest", () => {
+    it("should add new interest with metadata and clear pending selection", async () => {
+      const { result } = renderHook(() =>
+        useInterestManagement(
+          centerMapFn,
+          mapInstance,
+          addInterest,
+          updateInterest,
+          deleteInterest,
+        ),
+      );
+
+      act(() => {
+        result.current.handleStartAddInterest();
+      });
+
+      const coordinates = { lat: 42.7, lng: 23.3 };
+      const radius = 500;
+
+      act(() => {
+        result.current.handleSaveInterest(coordinates, radius);
+      });
+
+      act(() => {
+        result.current.handleConfirmPendingInterest({
+          label: "Вкъщи",
+          color: DEFAULT_ZONE_COLOR,
+        });
+      });
+
+      await waitFor(() => {
+        expect(addInterest).toHaveBeenCalledWith(coordinates, radius, {
+          label: "Вкъщи",
+          color: DEFAULT_ZONE_COLOR,
+        });
+      });
+
+      await waitFor(() => {
+        expect(result.current.pendingNewInterest).toBeNull();
+      });
+    });
+
+    it("should do nothing when there is no pending selection", () => {
+      const { result } = renderHook(() =>
+        useInterestManagement(
+          centerMapFn,
+          mapInstance,
+          addInterest,
+          updateInterest,
+          deleteInterest,
+        ),
+      );
+
+      act(() => {
+        result.current.handleConfirmPendingInterest({ label: "Тест" });
+      });
+
+      expect(addInterest).not.toHaveBeenCalled();
+    });
+
+    it("should show alert when adding interest fails", async () => {
+      addInterest.mockRejectedValue(new Error("Failed to add"));
+
+      const { result } = renderHook(() =>
+        useInterestManagement(
+          centerMapFn,
+          mapInstance,
+          addInterest,
+          updateInterest,
+          deleteInterest,
+        ),
+      );
+
+      act(() => {
+        result.current.handleStartAddInterest();
+      });
+
+      const coordinates = { lat: 42.7, lng: 23.3 };
+      const radius = 500;
+
+      act(() => {
+        result.current.handleSaveInterest(coordinates, radius);
+      });
+
+      act(() => {
+        result.current.handleConfirmPendingInterest({
+          label: "Вкъщи",
+          color: DEFAULT_ZONE_COLOR,
+        });
       });
 
       await waitFor(() => {
@@ -585,19 +744,41 @@ describe("useInterestManagement", () => {
       act(() => {
         result.current.handleStartAddInterest();
       });
-      expect(result.current.targetMode).toEqual({
-        active: true,
-        initialRadius: 500,
-        editingInterestId: null,
-      });
+      expect(result.current.targetMode).toEqual(
+        expect.objectContaining({
+          active: true,
+          initialRadius: 500,
+          editingInterestId: null,
+        }),
+      );
 
       // Save interest
       act(() => {
         result.current.handleSaveInterest({ lat: 42.7, lng: 23.3 }, 500);
       });
 
+      expect(result.current.pendingNewInterest).toEqual({
+        coordinates: { lat: 42.7, lng: 23.3 },
+        radius: 500,
+      });
+
+      act(() => {
+        result.current.handleConfirmPendingInterest({
+          label: "Вкъщи",
+          color: DEFAULT_ZONE_COLOR,
+        });
+      });
+
       await waitFor(() => {
         expect(result.current.targetMode.active).toBe(false);
+      });
+
+      await waitFor(() => {
+        expect(addInterest).toHaveBeenCalledWith(
+          { lat: 42.7, lng: 23.3 },
+          500,
+          { label: "Вкъщи", color: DEFAULT_ZONE_COLOR },
+        );
       });
     });
 

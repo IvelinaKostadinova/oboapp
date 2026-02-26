@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback } from "react";
 import MapComponent from "@/components/MapComponent";
 import GeolocationButton from "@/components/GeolocationButton";
 import NotificationButton from "@/components/onboarding/NotificationButton";
-import AddInterestButton from "@/components/onboarding/AddInterestButton";
 import LoadingButton from "@/components/onboarding/LoadingButton";
 import { useGeolocationPrompt } from "@/lib/hooks/useGeolocationPrompt";
 import { useOnboardingFlow } from "@/lib/hooks/useOnboardingFlow";
@@ -21,6 +20,7 @@ interface MapContainerProps {
     active: boolean;
     initialRadius?: number;
     editingInterestId?: string | null;
+    pendingColor?: string;
   };
   readonly initialMapCenter?: { lat: number; lng: number } | null;
   readonly hoveredMessageId?: string | null;
@@ -42,7 +42,8 @@ interface MapContainerProps {
     west: number;
     zoom: number;
   }) => void;
-  readonly onInterestClick: (interest: Interest) => void;
+  readonly onInterestClick?: (interest: Interest) => void;
+  readonly interestsInteractive?: boolean;
   readonly onSaveInterest: (
     coordinates: { lat: number; lng: number },
     radius: number,
@@ -79,6 +80,7 @@ export default function MapContainer({
   onMapReady,
   onBoundsChanged,
   onInterestClick,
+  interestsInteractive = true,
   onSaveInterest,
   onCancelTargetMode,
   onStartAddInterest,
@@ -263,6 +265,7 @@ export default function MapContainer({
         onBoundsChanged={onBoundsChanged}
         interests={interests}
         onInterestClick={onInterestClick}
+        interestsInteractive={interestsInteractive}
         initialCenter={initialMapCenter || undefined}
         shouldTrackLocation={isTrackingLocation}
         hoveredMessageId={hoveredMessageId}
@@ -273,6 +276,7 @@ export default function MapContainer({
                 active: true,
                 initialRadius: targetMode.initialRadius,
                 editingInterestId: targetMode.editingInterestId,
+                pendingColor: targetMode.pendingColor,
                 onSave: onSaveInterest,
                 onCancel: onCancelTargetMode,
               }
@@ -287,13 +291,6 @@ export default function MapContainer({
           {onboardingState === "idle" && (
             <NotificationButton
               onClick={handleAddInterestClick}
-              visible={true}
-            />
-          )}
-          {onboardingState === "complete" && (
-            <AddInterestButton
-              onClick={handleAddInterestClick}
-              isUserAuthenticated={!!authUser}
               visible={true}
             />
           )}

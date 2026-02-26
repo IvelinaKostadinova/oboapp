@@ -35,10 +35,12 @@ interface MapComponentProps {
   }) => void;
   readonly interests?: Interest[];
   readonly onInterestClick?: (interest: Interest) => void;
+  readonly interestsInteractive?: boolean;
   readonly targetMode?: {
     active: boolean;
     initialRadius?: number;
     editingInterestId?: string | null;
+    pendingColor?: string;
     onSave: (coordinates: { lat: number; lng: number }, radius: number) => void;
     onCancel: () => void;
   };
@@ -109,6 +111,7 @@ export default function MapComponent({
   onBoundsChanged,
   interests = [],
   onInterestClick,
+  interestsInteractive = true,
   targetMode,
   initialCenter,
   shouldTrackLocation = false,
@@ -294,10 +297,12 @@ export default function MapComponent({
           />
 
           {/* Render interest circles */}
-          {interests && interests.length > 0 && onInterestClick && (
+          {interests && interests.length > 0 && (
             <InterestCircles
+              map={mapInstance}
               interests={interests}
               onInterestClick={onInterestClick}
+              interactive={interestsInteractive}
               editingInterestId={targetMode?.editingInterestId}
               hideAll={false}
             />
@@ -308,6 +313,8 @@ export default function MapComponent({
             <InterestTargetMode
               map={mapInstance}
               initialRadius={targetMode.initialRadius}
+              pendingColor={targetMode.pendingColor}
+              isEditing={!!targetMode.editingInterestId}
               onSave={targetMode.onSave}
               onCancel={targetMode.onCancel}
             />

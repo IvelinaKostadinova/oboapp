@@ -1,7 +1,7 @@
 "use client";
 
+import React, { useMemo } from "react";
 import { Message } from "@/lib/types";
-import { useMemo } from "react";
 import MessageCard, { MessageCardSkeleton } from "./MessageCard";
 
 interface MessagesGridProps {
@@ -10,7 +10,6 @@ interface MessagesGridProps {
   readonly onMessageClick: (message: Message) => void;
   readonly onMessageHover?: (messageId: string | null) => void;
   readonly limit?: number;
-  readonly showHeading?: boolean;
   readonly variant?: "grid" | "list";
 }
 
@@ -77,7 +76,6 @@ export default function MessagesGrid({
   onMessageClick,
   onMessageHover,
   limit = 6,
-  showHeading = true,
   variant = "grid",
 }: MessagesGridProps) {
   // Helper to parse date
@@ -115,8 +113,6 @@ export default function MessagesGrid({
       ? "grid grid-cols-1 @lg:grid-cols-2 gap-4 min-w-0"
       : "grid grid-cols-1 @md:grid-cols-2 @xl:grid-cols-3 gap-6 min-w-0";
 
-  const headingText = variant === "list" ? "Събития" : "Последни съобщения";
-
   const gridContent = (
     <GridContent
       containerClasses={containerClasses}
@@ -130,26 +126,13 @@ export default function MessagesGrid({
     />
   );
 
-  return showHeading ? (
-    <div className={variant === "list" ? "" : "bg-gray-50 py-12"}>
-      <div
-        className={
-          variant === "list" ? "" : "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
-        }
-      >
-        <h2
-          className={
-            variant === "list"
-              ? "text-lg font-medium text-gray-700 mb-4"
-              : "text-3xl font-bold text-gray-900 mb-8"
-          }
-        >
-          {headingText}
-        </h2>
+  return variant === "list" ? (
+    gridContent
+  ) : (
+    <div className="bg-gray-50 py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {gridContent}
       </div>
     </div>
-  ) : (
-    gridContent
   );
 }

@@ -188,6 +188,8 @@ export const handlers = [
     const body = (await request.json()) as {
       coordinates: { lat: number; lng: number };
       radius: number;
+      label?: string;
+      color?: string;
     };
 
     const newInterest: Interest = {
@@ -195,6 +197,8 @@ export const handlers = [
       userId: MOCK_USER_ID,
       coordinates: body.coordinates,
       radius: Math.max(100, Math.min(1000, body.radius || 500)),
+      ...(body.label ? { label: body.label } : {}),
+      ...(body.color ? { color: body.color } : {}),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -209,6 +213,8 @@ export const handlers = [
       id: string;
       coordinates?: { lat: number; lng: number };
       radius?: number;
+      label?: string;
+      color?: string;
     };
     const { id } = body;
 
@@ -223,6 +229,8 @@ export const handlers = [
       radius: body.radius
         ? Math.max(100, Math.min(1000, body.radius))
         : interests[index].radius,
+      ...(body.label !== undefined ? { label: body.label } : {}),
+      ...(body.color !== undefined ? { color: body.color } : {}),
       updatedAt: new Date().toISOString(),
     };
 

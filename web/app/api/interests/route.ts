@@ -3,6 +3,7 @@ import { getDb } from "@/lib/db";
 import { Interest } from "@/lib/types";
 import { verifyAuthToken } from "@/lib/verifyAuthToken";
 import { toRequiredISOString } from "@/lib/date-serialization";
+import { sanitizeZoneColor, sanitizeZoneLabel } from "@/lib/zoneTypes";
 
 // Constants
 const MIN_RADIUS = 100; // meters
@@ -17,12 +18,64 @@ function validateRadius(radius: number): number {
   return Math.max(MIN_RADIUS, Math.min(MAX_RADIUS, radius));
 }
 
+function applyCoordinatesUpdate(
+  updates: Record<string, unknown>,
+  coordinates: unknown,
+): NextResponse | null {
+  if (!coordinates) {
+    return null;
+  }
+
+  const coords = coordinates as { lat?: unknown; lng?: unknown };
+  if (typeof coords.lat !== "number" || typeof coords.lng !== "number") {
+    return NextResponse.json({ error: "Invalid coordinates" }, { status: 400 });
+  }
+
+  updates.coordinates = {
+    lat: coords.lat,
+    lng: coords.lng,
+  };
+  return null;
+}
+
+function applyRadiusUpdate(
+  updates: Record<string, unknown>,
+  radius: unknown,
+): void {
+  if (radius === undefined) {
+    return;
+  }
+
+  updates.radius = validateRadius(radius as number);
+}
+
+function applyMetadataUpdates(
+  updates: Record<string, unknown>,
+  metadata: { label?: unknown; color?: unknown },
+): void {
+  if (typeof metadata.label === "string") {
+    const sanitizedLabel = sanitizeZoneLabel(metadata.label);
+    if (sanitizedLabel) {
+      updates.label = sanitizedLabel;
+    }
+  }
+
+  if (typeof metadata.color === "string") {
+    const sanitizedColor = sanitizeZoneColor(metadata.color);
+    if (sanitizedColor) {
+      updates.color = sanitizedColor;
+    }
+  }
+}
+
 function recordToInterest(record: Record<string, unknown>): Interest {
   return {
     id: record._id as string,
     userId: record.userId as string,
     coordinates: record.coordinates as Interest["coordinates"],
     radius: record.radius as number,
+    label: record.label as string | undefined,
+    color: record.color as string | undefined,
     createdAt: toRequiredISOString(record.createdAt, "createdAt"),
     updatedAt: toRequiredISOString(record.updatedAt, "updatedAt"),
   };
@@ -114,7 +167,7 @@ export async function POST(request: NextRequest) {
     const { userId } = await verifyAuthToken(authHeader);
 
     const body = await request.json();
-    const { coordinates, radius } = body;
+    const { coordinates, radius, label, color } = body;
 
     // Validate coordinates
     if (
@@ -130,9 +183,11 @@ export async function POST(request: NextRequest) {
 
     // Validate and sanitize radius
     const validatedRadius = validateRadius(radius);
+    const sanitizedLabel = sanitizeZoneLabel(label);
+    const sanitizedColor = sanitizeZoneColor(color);
 
     const now = new Date();
-    const interestData = {
+    const interestData: Record<string, unknown> = {
       userId,
       coordinates: {
         lat: coordinates.lat,
@@ -143,12 +198,23 @@ export async function POST(request: NextRequest) {
       updatedAt: now,
     };
 
+    if (sanitizedLabel) {
+      interestData.label = sanitizedLabel;
+    }
+    if (sanitizedColor) {
+      interestData.color = sanitizedColor;
+    }
+
     const db = await getDb();
     const docId = await db.interests.insertOne(interestData);
 
     const newInterest: Interest = {
       id: docId,
-      ...interestData,
+      userId,
+      coordinates: { lat: coordinates.lat, lng: coordinates.lng },
+      radius: validatedRadius,
+      ...(sanitizedLabel ? { label: sanitizedLabel } : {}),
+      ...(sanitizedColor ? { color: sanitizedColor } : {}),
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
     };
@@ -269,27 +335,13 @@ export async function PATCH(request: NextRequest) {
       updatedAt: new Date(),
     };
 
-    // Update coordinates if provided
-    if (coordinates) {
-      if (
-        typeof coordinates.lat !== "number" ||
-        typeof coordinates.lng !== "number"
-      ) {
-        return NextResponse.json(
-          { error: "Invalid coordinates" },
-          { status: 400 },
-        );
-      }
-      updates.coordinates = {
-        lat: coordinates.lat,
-        lng: coordinates.lng,
-      };
+    const coordinatesError = applyCoordinatesUpdate(updates, coordinates);
+    if (coordinatesError) {
+      return coordinatesError;
     }
 
-    // Update radius if provided
-    if (radius !== undefined) {
-      updates.radius = validateRadius(radius);
-    }
+    applyRadiusUpdate(updates, radius);
+    applyMetadataUpdates(updates, { label: body.label, color: body.color });
 
     await db.interests.updateOne(id, updates);
 
