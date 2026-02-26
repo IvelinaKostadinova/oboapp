@@ -230,7 +230,7 @@ export default function MessageDetailView({
       aria-label="Детайли за сигнала"
       className={`fixed ${zIndex.overlayContent} bg-white shadow-2xl overflow-y-auto transition-all duration-300 ease-out
         bottom-0 left-0 right-0 rounded-t-2xl
-        sm:inset-y-0 sm:left-auto sm:right-0 sm:w-96 sm:max-h-none sm:rounded-none
+        sm:inset-y-0 sm:left-auto sm:right-0 sm:w-96 [@media(min-width:1280px)_and_(min-aspect-ratio:4/3)]:w-2/5 sm:max-h-none sm:rounded-none
         ${
           isVisible
             ? "translate-y-0 sm:translate-y-0 sm:translate-x-0"
