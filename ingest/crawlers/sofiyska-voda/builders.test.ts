@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildTitle,
-  buildMessage,
+  buildPlainTextMessage,
+  buildMarkdownMessage,
   buildFeatureProperties,
   buildGeoJsonFeatureCollection,
   buildSourceDocument,
@@ -62,7 +63,7 @@ describe("sofiyska-voda/builders", () => {
     });
   });
 
-  describe("buildMessage", () => {
+  describe("buildMarkdownMessage", () => {
     it("should build complete message", () => {
       const attributes = {
         LOCATION: "ул. Иван Вазов",
@@ -75,10 +76,10 @@ describe("sofiyska-voda/builders", () => {
         CONTACT: "02/123-456",
       };
 
-      const message = buildMessage(attributes, mockLayer);
+      const message = buildMarkdownMessage(attributes, mockLayer);
       expect(message).toContain("ул. Иван Вазов");
       expect(message).toContain("Авария на водопровод");
-      expect(message).toContain("Текущи спирания");
+      expect(message).toContain("**Категория:** Текущи спирания");
       expect(message).toContain("In Progress");
       expect(message).toContain("2025");
     });
@@ -89,16 +90,45 @@ describe("sofiyska-voda/builders", () => {
         DESCRIPTION: "Same text",
       };
 
-      const message = buildMessage(attributes, mockLayer);
-      // Should only include "Same text" once
+      const message = buildMarkdownMessage(attributes, mockLayer);
       const matches = message.match(/Same text/g);
       expect(matches).toHaveLength(1);
     });
 
     it("should handle missing fields", () => {
       const attributes = {};
-      const message = buildMessage(attributes, mockLayer);
-      expect(message).toContain("Текущи спирания");
+      const message = buildMarkdownMessage(attributes, mockLayer);
+      expect(message).toContain("**Категория:** Текущи спирания");
+    });
+  });
+
+  describe("buildPlainTextMessage", () => {
+    it("should build plain text without markdown formatting", () => {
+      const attributes = {
+        LOCATION: "ул. Иван Вазов",
+        DESCRIPTION: "Авария на водопровод",
+        START_: new Date("2025-12-29T10:00:00").getTime(),
+        ALERTEND: new Date("2025-12-29T18:00:00").getTime(),
+        LASTUPDATE: new Date("2025-12-29T12:00:00").getTime(),
+        ACTIVESTATUS: "In Progress",
+        SOFIADISTRICT: 5,
+        CONTACT: "02/123-456",
+      };
+
+      const message = buildPlainTextMessage(attributes, mockLayer);
+      expect(message).not.toContain("**");
+      expect(message).toContain("ул. Иван Вазов");
+      expect(message).toContain("Авария на водопровод");
+      expect(message).toContain("Категория: Текущи спирания");
+      expect(message).toContain("Статус: In Progress");
+      expect(message).toContain("2025");
+    });
+
+    it("should handle missing fields without markdown", () => {
+      const attributes = {};
+      const message = buildPlainTextMessage(attributes, mockLayer);
+      expect(message).not.toContain("**");
+      expect(message).toContain("Категория: Текущи спирания");
     });
   });
 

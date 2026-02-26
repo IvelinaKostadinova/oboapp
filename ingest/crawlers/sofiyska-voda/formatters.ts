@@ -28,7 +28,7 @@ export function ensureDate(timestamp?: number | null): Date | null {
  */
 export function formatDate(
   date?: Date | null,
-  formatter?: Intl.DateTimeFormat
+  formatter?: Intl.DateTimeFormat,
 ): string | null {
   if (!date) return null;
 
@@ -41,13 +41,29 @@ export function formatDate(
   return (formatter ?? defaultFormatter).format(date);
 }
 
-/**
- * Build markdown message from feature attributes
- */
-export function buildMessage(
+type LabelFormatter = (label: string, value: string) => string;
+
+interface MessageFormat {
+  fmtLabel: LabelFormatter;
+  metadataJoin: string;
+}
+
+const PLAIN_FORMAT: MessageFormat = {
+  fmtLabel: (l, v) => `${l}: ${v}`,
+  metadataJoin: "\n",
+};
+
+const MARKDOWN_FORMAT: MessageFormat = {
+  fmtLabel: (l, v) => `**${l}:** ${v}`,
+  // Use 2 spaces + newline for proper markdown hard line breaks
+  metadataJoin: "  \n",
+};
+
+function buildMessageInternal(
   attributes: Record<string, unknown> | undefined,
   layer: { name: string },
-  dateFormatter?: Intl.DateTimeFormat
+  format: MessageFormat,
+  dateFormatter?: Intl.DateTimeFormat,
 ): string {
   const paragraphs: string[] = [];
   const location = sanitizeText(attributes?.LOCATION as string | null);
@@ -63,35 +79,64 @@ export function buildMessage(
 
   const startDate = formatDate(
     ensureDate(attributes?.START_ as number | null),
-    dateFormatter
+    dateFormatter,
   );
   const endDate = formatDate(
     ensureDate(attributes?.ALERTEND as number | null),
-    dateFormatter
+    dateFormatter,
   );
   const lastUpdate = formatDate(
     ensureDate(attributes?.LASTUPDATE as number | null),
-    dateFormatter
+    dateFormatter,
   );
 
+  const { fmtLabel } = format;
   const metadata = [
-    `**Категория:** ${layer.name}`,
+    fmtLabel("Категория", layer.name),
     attributes?.ACTIVESTATUS
-      ? `**Статус:** ${attributes.ACTIVESTATUS as string}`
+      ? fmtLabel("Статус", attributes.ACTIVESTATUS as string)
       : null,
-    startDate ? `**Начало:** ${startDate}` : null,
-    endDate ? `**Край:** ${endDate}` : null,
-    lastUpdate ? `**Последно обновяване:** ${lastUpdate}` : null,
+    startDate ? fmtLabel("Начало", startDate) : null,
+    endDate ? fmtLabel("Край", endDate) : null,
+    lastUpdate ? fmtLabel("Последно обновяване", lastUpdate) : null,
     attributes?.SOFIADISTRICT
-      ? `**Район на СО (ID):** ${attributes.SOFIADISTRICT as number}`
+      ? fmtLabel("Район на СО (ID)", String(attributes.SOFIADISTRICT as number))
       : null,
-    attributes?.CONTACT ? `**Контакт:** ${attributes.CONTACT as string}` : null,
+    attributes?.CONTACT
+      ? fmtLabel("Контакт", attributes.CONTACT as string)
+      : null,
   ].filter(Boolean);
 
   if (metadata.length) {
-    // Use 2 spaces + newline for proper markdown hard line breaks
-    paragraphs.push(metadata.join("  \n"));
+    paragraphs.push(metadata.join(format.metadataJoin));
   }
 
   return paragraphs.join("\n\n");
+}
+
+/**
+ * Build plain text message from feature attributes (used for notifications and text field)
+ */
+export function buildPlainTextMessage(
+  attributes: Record<string, unknown> | undefined,
+  layer: { name: string },
+  dateFormatter?: Intl.DateTimeFormat,
+): string {
+  return buildMessageInternal(attributes, layer, PLAIN_FORMAT, dateFormatter);
+}
+
+/**
+ * Build markdown message from feature attributes (used for markdownText field)
+ */
+export function buildMarkdownMessage(
+  attributes: Record<string, unknown> | undefined,
+  layer: { name: string },
+  dateFormatter?: Intl.DateTimeFormat,
+): string {
+  return buildMessageInternal(
+    attributes,
+    layer,
+    MARKDOWN_FORMAT,
+    dateFormatter,
+  );
 }

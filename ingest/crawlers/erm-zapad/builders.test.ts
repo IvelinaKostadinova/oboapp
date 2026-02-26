@@ -1,8 +1,59 @@
 import { describe, expect, it } from "vitest";
 import type { PinRecord } from "./types";
-import { buildGeoJSON, buildMessage, buildTitle } from "./builders";
+import {
+  buildGeoJSON,
+  buildMarkdownMessage,
+  buildPlainTextMessage,
+  buildTitle,
+} from "./builders";
 
-describe("buildMessage", () => {
+describe("buildPlainTextMessage", () => {
+  it("should build complete plain text message without markdown", () => {
+    const pin: PinRecord = {
+      lat: 42.700634,
+      lon: 23.322667,
+      eventId: "SF_7650",
+      typedist: "Планирано прекъсване",
+      city_name: "София",
+      begin_event: "29.12.2025 10:00",
+      end_event: "29.12.2025 16:00",
+      cities: "",
+    };
+
+    const message = buildPlainTextMessage(pin);
+
+    expect(message).not.toContain("**");
+    expect(message).toContain("Планирано прекъсване");
+    expect(message).toContain("Населено място: София");
+    expect(message).toContain("Начало: 29.12.2025 10:00");
+    expect(message).toContain("Край: 29.12.2025 16:00");
+    expect(message).toContain("Мрежов код: SF_7650");
+  });
+
+  it("should build plain text message without optional fields", () => {
+    const pin: PinRecord = {
+      lat: 42.6977,
+      lon: 23.3219,
+      eventId: "SF_1234",
+      typedist: "Авария",
+      city_name: "",
+      begin_event: "",
+      end_event: "",
+      cities: "",
+    };
+
+    const message = buildPlainTextMessage(pin);
+
+    expect(message).not.toContain("**");
+    expect(message).toContain("Авария");
+    expect(message).not.toContain("Населено място:");
+    expect(message).not.toContain("Начало:");
+    expect(message).not.toContain("Край:");
+    expect(message).toContain("Мрежов код: SF_1234");
+  });
+});
+
+describe("buildMarkdownMessage", () => {
   it("should build complete message with all fields", () => {
     const pin: PinRecord = {
       lat: 42.700634,
@@ -15,7 +66,7 @@ describe("buildMessage", () => {
       cities: "",
     };
 
-    const message = buildMessage(pin);
+    const message = buildMarkdownMessage(pin);
 
     expect(message).toContain("**Планирано прекъсване**");
     expect(message).toContain("**Населено място:** София");
@@ -36,7 +87,7 @@ describe("buildMessage", () => {
       cities: "",
     };
 
-    const message = buildMessage(pin);
+    const message = buildMarkdownMessage(pin);
 
     expect(message).toContain("**Авария**");
     expect(message).not.toContain("**Населено място:**");
@@ -57,7 +108,7 @@ describe("buildMessage", () => {
       cities: "",
     };
 
-    const message = buildMessage(pin);
+    const message = buildMarkdownMessage(pin);
 
     expect(message).toContain("**Начало:** 29.12.2025 10:00");
     expect(message).not.toContain("**Край:**");
@@ -75,7 +126,7 @@ describe("buildMessage", () => {
       cities: "",
     };
 
-    const message = buildMessage(pin);
+    const message = buildMarkdownMessage(pin);
     const lines = message.split("\n");
 
     expect(lines[0]).toBe("**Планирано прекъсване**");

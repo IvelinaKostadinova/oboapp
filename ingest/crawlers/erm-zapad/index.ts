@@ -6,7 +6,12 @@ import { validateAndFixGeoJSON } from "../shared/geojson-validation";
 import { launchBrowser } from "../shared/browser";
 import { saveSourceDocumentIfNew } from "../shared/firestore";
 import { parseBulgarianDateTime } from "../shared/date-utils";
-import { buildGeoJSON, buildMessage, buildTitle } from "./builders";
+import {
+  buildGeoJSON,
+  buildPlainTextMessage,
+  buildMarkdownMessage,
+  buildTitle,
+} from "./builders";
 import { extractPinRecords } from "./extractors";
 import { deduplicatePinRecords } from "./deduplication";
 import { parseTimespans } from "./timespan-parsing";
@@ -87,7 +92,10 @@ async function discoverMunicipalities(): Promise<Municipality[]> {
       return results;
     });
 
-    logger.info("Found municipalities", { count: municipalities.length, municipalities: municipalities.map((m) => `${m.code}: ${m.name}`) });
+    logger.info("Found municipalities", {
+      count: municipalities.length,
+      municipalities: municipalities.map((m) => `${m.code}: ${m.name}`),
+    });
 
     return municipalities;
   } finally {
@@ -164,18 +172,25 @@ function buildSourceDocument(pins: PinRecord[]): ErmZapadSourceDocument | null {
   // Validate and fix GeoJSON
   const validation = validateAndFixGeoJSON(geoJson, pin.eventId);
   if (!validation.isValid || !validation.geoJson) {
-    logger.warn("Invalid GeoJSON for incident", { eventId: pin.eventId, errors: validation.errors });
+    logger.warn("Invalid GeoJSON for incident", {
+      eventId: pin.eventId,
+      errors: validation.errors,
+    });
     return null;
   }
 
   // Log any coordinate fixes
   if (validation.warnings.length > 0) {
-    logger.warn("Fixed GeoJSON for incident", { eventId: pin.eventId, warnings: validation.warnings });
+    logger.warn("Fixed GeoJSON for incident", {
+      eventId: pin.eventId,
+      warnings: validation.warnings,
+    });
   }
 
   const url = `${BASE_URL}/incidents/${pin.eventId}`;
   const title = buildTitle(pin);
-  const message = buildMessage(pin);
+  const message = buildPlainTextMessage(pin);
+  const markdownText = buildMarkdownMessage(pin);
 
   // Use pin start time as published date, fallback to current time
   let datePublished = new Date().toISOString();
@@ -183,7 +198,10 @@ function buildSourceDocument(pins: PinRecord[]): ErmZapadSourceDocument | null {
     try {
       datePublished = parseBulgarianDateTime(pin.begin_event).toISOString();
     } catch {
-      logger.warn("Invalid date format", { eventId: pin.eventId, beginEvent: pin.begin_event });
+      logger.warn("Invalid date format", {
+        eventId: pin.eventId,
+        beginEvent: pin.begin_event,
+      });
     }
   }
 
@@ -195,7 +213,7 @@ function buildSourceDocument(pins: PinRecord[]): ErmZapadSourceDocument | null {
     datePublished,
     title,
     message,
-    markdownText: message,
+    markdownText,
     sourceType: SOURCE_TYPE,
     locality: LOCALITY,
     crawledAt: new Date(),
@@ -213,11 +231,16 @@ function buildSourceDocument(pins: PinRecord[]): ErmZapadSourceDocument | null {
 async function processMunicipality(
   municipality: Municipality,
 ): Promise<PinRecord[]> {
-  logger.info("Processing municipality", { name: municipality.name, code: municipality.code });
+  logger.info("Processing municipality", {
+    name: municipality.name,
+    code: municipality.code,
+  });
 
   try {
     const incidents = await fetchMunicipalityIncidents(municipality.code);
-    logger.info("Found incidents for municipality", { count: incidents.length });
+    logger.info("Found incidents for municipality", {
+      count: incidents.length,
+    });
 
     if (incidents.length === 0) {
       return [];
@@ -233,7 +256,10 @@ async function processMunicipality(
     logger.info("Extracted pins", { count: allPins.length });
     return allPins;
   } catch (error) {
-    logger.error("Failed to fetch incidents for municipality", { code: municipality.code, error: error instanceof Error ? error.message : String(error) });
+    logger.error("Failed to fetch incidents for municipality", {
+      code: municipality.code,
+      error: error instanceof Error ? error.message : String(error),
+    });
     throw error; // Re-throw to fail the crawl
   }
 }
@@ -256,13 +282,19 @@ async function saveIncidents(
 
       const saved = await saveSourceDocumentIfNew(doc, db);
       if (saved) {
-        logger.info("Saved incident", { title: doc.title, pinCount: pins.length });
+        logger.info("Saved incident", {
+          title: doc.title,
+          pinCount: pins.length,
+        });
         summary.saved++;
       } else {
         summary.skipped++;
       }
     } catch (error) {
-      logger.error("Failed to process incident", { eventId, error: error instanceof Error ? error.message : String(error) });
+      logger.error("Failed to process incident", {
+        eventId,
+        error: error instanceof Error ? error.message : String(error),
+      });
       summary.failed++;
     }
   }
@@ -302,12 +334,18 @@ async function crawl(): Promise<void> {
 
     // Deduplicate globally across all municipalities
     const uniquePins = deduplicatePinRecords(allPins);
-    logger.info("Unique pins after deduplication", { uniqueCount: uniquePins.length, removedDuplicates: allPins.length - uniquePins.length });
+    logger.info("Unique pins after deduplication", {
+      uniqueCount: uniquePins.length,
+      removedDuplicates: allPins.length - uniquePins.length,
+    });
 
     // Group pins by eventId to handle potential duplicates across municipalities
     const incidentMap = groupPinsByEventId(uniquePins);
 
-    logger.info("Incidents after grouping", { incidentCount: incidentMap.size, totalPins: uniquePins.length });
+    logger.info("Incidents after grouping", {
+      incidentCount: incidentMap.size,
+      totalPins: uniquePins.length,
+    });
 
     // Dynamic import after dotenv.config
     const { getDb } = await import("@/lib/db");
@@ -318,7 +356,12 @@ async function crawl(): Promise<void> {
 
     // Final summary
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-    logger.info("Crawl complete", { durationSeconds: duration, saved: totalSummary.saved, skipped: totalSummary.skipped, failed: totalSummary.failed });
+    logger.info("Crawl complete", {
+      durationSeconds: duration,
+      saved: totalSummary.saved,
+      skipped: totalSummary.skipped,
+      failed: totalSummary.failed,
+    });
 
     // Exit with error if all failed
     if (
@@ -330,7 +373,9 @@ async function crawl(): Promise<void> {
       process.exit(1);
     }
   } catch (error) {
-    logger.error("Crawl failed", { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Crawl failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     process.exit(1);
   }
 }

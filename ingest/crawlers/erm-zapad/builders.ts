@@ -32,34 +32,54 @@ export function buildGeoJSON(
   };
 }
 
-/**
- * Build markdown message for pin
- */
-export function buildMessage(pin: PinRecord): string {
+type TitleFormatter = (title: string) => string;
+type LabelFormatter = (label: string, value: string) => string;
+
+function buildMessageInternal(
+  pin: PinRecord,
+  fmtTitle: TitleFormatter,
+  fmtLabel: LabelFormatter,
+): string {
   const lines: string[] = [];
 
-  // Title
-  lines.push(`**${pin.typedist}**\n`);
+  lines.push(fmtTitle(pin.typedist) + "\n");
 
-  // Location
   if (pin.city_name) {
-    lines.push(`**Населено място:** ${pin.city_name}`);
+    lines.push(fmtLabel("Населено място", pin.city_name));
   }
-
-  // Time range
   if (pin.begin_event) {
-    lines.push(`**Начало:** ${pin.begin_event}`);
+    lines.push(fmtLabel("Начало", pin.begin_event));
   }
   if (pin.end_event) {
-    lines.push(`**Край:** ${pin.end_event}`);
+    lines.push(fmtLabel("Край", pin.end_event));
   }
-
-  // Grid identifier
   if (pin.eventId) {
-    lines.push(`**Мрежов код:** ${pin.eventId}`);
+    lines.push(fmtLabel("Мрежов код", pin.eventId));
   }
 
   return lines.join("\n");
+}
+
+/**
+ * Build plain text message for pin (used for notifications and text field)
+ */
+export function buildPlainTextMessage(pin: PinRecord): string {
+  return buildMessageInternal(
+    pin,
+    (t) => t,
+    (l, v) => `${l}: ${v}`,
+  );
+}
+
+/**
+ * Build markdown message for pin (used for markdownText field)
+ */
+export function buildMarkdownMessage(pin: PinRecord): string {
+  return buildMessageInternal(
+    pin,
+    (t) => `**${t}**`,
+    (l, v) => `**${l}:** ${v}`,
+  );
 }
 
 /**

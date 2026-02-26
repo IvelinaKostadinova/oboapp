@@ -4,11 +4,15 @@ import type {
   SofiyskaVodaSourceDocument,
 } from "./types";
 import type { GeoJSONFeature, GeoJSONFeatureCollection } from "@/lib/types";
-import { sanitizeText, ensureDate, buildMessage } from "./formatters";
+import {
+  sanitizeText,
+  ensureDate,
+  buildPlainTextMessage,
+  buildMarkdownMessage,
+} from "./formatters";
 import { logger } from "@/lib/logger";
 
-// Re-export for backward compatibility
-export { buildMessage } from "./formatters";
+export { buildPlainTextMessage, buildMarkdownMessage } from "./formatters";
 
 const SOURCE_TYPE = "sofiyska-voda";
 const LOCALITY = "bg.sofia";
@@ -162,7 +166,12 @@ export async function buildSourceDocument(
   }
 
   const url = getFeatureUrl(layer.id, objectId);
-  const message = buildMessage(
+  const message = buildPlainTextMessage(
+    feature.attributes as Record<string, unknown>,
+    layer,
+    dateFormatter,
+  );
+  const markdownText = buildMarkdownMessage(
     feature.attributes as Record<string, unknown>,
     layer,
     dateFormatter,
@@ -200,10 +209,16 @@ export async function buildSourceDocument(
   // Fallback to lastUpdate if invalid or missing
   if (!isStartValid || !isEndValid) {
     if (!isStartValid && feature.attributes?.START_) {
-      logger.warn("START_ outside valid range", { objectId: feature.attributes.OBJECTID, startValue: feature.attributes.START_ });
+      logger.warn("START_ outside valid range", {
+        objectId: feature.attributes.OBJECTID,
+        startValue: feature.attributes.START_,
+      });
     }
     if (!isEndValid && feature.attributes?.ALERTEND) {
-      logger.warn("ALERTEND outside valid range", { objectId: feature.attributes.OBJECTID, alertEnd: feature.attributes.ALERTEND });
+      logger.warn("ALERTEND outside valid range", {
+        objectId: feature.attributes.OBJECTID,
+        alertEnd: feature.attributes.ALERTEND,
+      });
     }
     timespanStart = lastUpdate;
     timespanEnd = lastUpdate;
@@ -215,7 +230,7 @@ export async function buildSourceDocument(
     datePublished: lastUpdate.toISOString(),
     title: buildTitle(feature.attributes, layer),
     message,
-    markdownText: message, // Store markdown in markdownText field
+    markdownText,
     sourceType: SOURCE_TYPE,
     locality: LOCALITY,
     crawledAt: new Date(),

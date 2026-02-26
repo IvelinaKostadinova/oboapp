@@ -93,9 +93,12 @@ async function sendNotifications(
       continue;
     }
 
+    // plainText is set by AI pipeline (Filter & Split stage).
+    // For precomputed-GeoJSON crawlers, text is already plain.
     const message: Message = {
       id: match.messageId,
-      text: (messageData.text as string) || "",
+      text:
+        (messageData.plainText as string) || (messageData.text as string) || "",
       locality: messageData.locality as string,
       geoJson: messageData.geoJson as Message["geoJson"],
       createdAt: toISOString(messageData.createdAt),

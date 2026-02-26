@@ -3,7 +3,8 @@ import {
   sanitizeText,
   ensureDate,
   formatDate,
-  buildMessage,
+  buildMarkdownMessage,
+  buildPlainTextMessage,
 } from "./formatters";
 
 describe("sofiyska-voda/formatters", () => {
@@ -85,7 +86,7 @@ describe("sofiyska-voda/formatters", () => {
     });
   });
 
-  describe("buildMessage", () => {
+  describe("buildMarkdownMessage", () => {
     const mockLayer = { name: "Текущи спирания" };
     const mockFormatter = new Intl.DateTimeFormat("bg-BG", {
       dateStyle: "long",
@@ -100,7 +101,7 @@ describe("sofiyska-voda/formatters", () => {
         LASTUPDATE: new Date("2025-12-28T10:58:00").getTime(),
       };
 
-      const result = buildMessage(attributes, mockLayer, mockFormatter);
+      const result = buildMarkdownMessage(attributes, mockLayer, mockFormatter);
 
       expect(result).toContain("ж.к. Младост 4");
       expect(result).toContain("Ремонт на уличен водопровод");
@@ -116,7 +117,7 @@ describe("sofiyska-voda/formatters", () => {
         LASTUPDATE: new Date("2025-12-28T10:58:00").getTime(),
       };
 
-      const result = buildMessage(attributes, mockLayer, mockFormatter);
+      const result = buildMarkdownMessage(attributes, mockLayer, mockFormatter);
 
       // Metadata should be joined with 2 spaces + newline (markdown hard break)
       expect(result).toContain("  \n");
@@ -136,7 +137,7 @@ describe("sofiyska-voda/formatters", () => {
         CONTACT: "test@example.com",
       };
 
-      const result = buildMessage(attributes, mockLayer);
+      const result = buildMarkdownMessage(attributes, mockLayer);
 
       expect(result).toContain("**Категория:**");
       expect(result).toContain("**Статус:**");
@@ -153,7 +154,7 @@ describe("sofiyska-voda/formatters", () => {
         DESCRIPTION: "Same text",
       };
 
-      const result = buildMessage(attributes, mockLayer);
+      const result = buildMarkdownMessage(attributes, mockLayer);
       const occurrences = (result.match(/Same text/g) || []).length;
       expect(occurrences).toBe(1);
     });
@@ -163,7 +164,7 @@ describe("sofiyska-voda/formatters", () => {
         LOCATION: "Test Location",
       };
 
-      const result = buildMessage(attributes, mockLayer);
+      const result = buildMarkdownMessage(attributes, mockLayer);
 
       expect(result).toContain("Test Location");
       expect(result).toContain("**Категория:**");
@@ -178,7 +179,7 @@ describe("sofiyska-voda/formatters", () => {
         LASTUPDATE: Date.now(),
       };
 
-      const result = buildMessage(attributes, mockLayer);
+      const result = buildMarkdownMessage(attributes, mockLayer);
 
       // Location and description should be separate paragraphs
       expect(result).toContain("Location text\n\n");
@@ -191,10 +192,66 @@ describe("sofiyska-voda/formatters", () => {
         DESCRIPTION: "Extra\n\tWhitespace",
       };
 
-      const result = buildMessage(attributes, mockLayer);
+      const result = buildMarkdownMessage(attributes, mockLayer);
 
       expect(result).toContain("Multiple Spaces");
       expect(result).toContain("Extra Whitespace");
+    });
+  });
+
+  describe("buildPlainTextMessage", () => {
+    const mockLayer = { name: "Текущи спирания" };
+
+    it("should build plain text without markdown formatting", () => {
+      const attributes = {
+        LOCATION: "ж.к. Младост 4",
+        DESCRIPTION: "Ремонт на уличен водопровод",
+        LASTUPDATE: new Date("2025-12-28T10:58:00").getTime(),
+        ACTIVESTATUS: "In Progress",
+      };
+
+      const result = buildPlainTextMessage(attributes, mockLayer);
+
+      expect(result).not.toContain("**");
+      expect(result).toContain("ж.к. Младост 4");
+      expect(result).toContain("Ремонт на уличен водопровод");
+      expect(result).toContain("Категория: Текущи спирания");
+      expect(result).toContain("Статус: In Progress");
+    });
+
+    it("should not use markdown hard line breaks", () => {
+      const attributes = {
+        LOCATION: "Test",
+        ACTIVESTATUS: "Active",
+        LASTUPDATE: Date.now(),
+      };
+
+      const result = buildPlainTextMessage(attributes, mockLayer);
+
+      expect(result).not.toContain("  \n");
+      expect(result).not.toContain("**");
+    });
+
+    it("should include all metadata labels without bold", () => {
+      const attributes = {
+        LOCATION: "Test",
+        ACTIVESTATUS: "Active",
+        START_: Date.now(),
+        ALERTEND: Date.now(),
+        LASTUPDATE: Date.now(),
+        SOFIADISTRICT: 13,
+        CONTACT: "test@example.com",
+      };
+
+      const result = buildPlainTextMessage(attributes, mockLayer);
+
+      expect(result).toContain("Категория:");
+      expect(result).toContain("Статус:");
+      expect(result).toContain("Начало:");
+      expect(result).toContain("Край:");
+      expect(result).toContain("Последно обновяване:");
+      expect(result).toContain("Район на СО (ID):");
+      expect(result).toContain("Контакт:");
     });
   });
 });

@@ -109,6 +109,44 @@ describe("notification-sender", () => {
       expect(payload.data.url).toContain("/m/aB3xYz12");
       expect(payload.webpush.fcmOptions.link).toContain("/m/aB3xYz12");
     });
+
+    it("should strip markdown bold formatting from message text", () => {
+      const markdownMessage: Message = {
+        ...baseMessage,
+        text: "**планирано**\n\n**Населено място:** София",
+      };
+
+      const payload = buildNotificationPayload(markdownMessage, {
+        ...baseMatch,
+        distance: undefined,
+      });
+
+      expect(payload.data.body).not.toContain("**");
+      expect(payload.data.body).toContain("планирано");
+      expect(payload.data.body).toContain("Населено място: София");
+    });
+
+    it("should strip headings, italic, links, and list markers", () => {
+      const markdownMessage: Message = {
+        ...baseMessage,
+        text: "## Предупреждение\n- Първо\n- _Второ_\n[линк](https://example.com)",
+      };
+
+      const payload = buildNotificationPayload(markdownMessage, {
+        ...baseMatch,
+        distance: undefined,
+      });
+
+      expect(payload.data.body).not.toContain("##");
+      expect(payload.data.body).not.toContain("- ");
+      expect(payload.data.body).not.toContain("_");
+      expect(payload.data.body).not.toContain("[линк]");
+      expect(payload.data.body).not.toContain("https://example.com");
+      expect(payload.data.body).toContain("Предупреждение");
+      expect(payload.data.body).toContain("Първо");
+      expect(payload.data.body).toContain("Второ");
+      expect(payload.data.body).toContain("линк");
+    });
   });
 
   describe("sendPushNotification", () => {
