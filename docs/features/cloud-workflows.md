@@ -37,7 +37,7 @@ Google Cloud Workflows
    - **Use case**: Short-lived disruptions requiring frequent updates (power outages, heating issues, water disruptions)
 
 2. **All Workflow** (`pipeline-all`)
-   - **Crawlers**: 11 sources (all currently deployed crawlers)
+  - **Crawlers**: 13 sources (all currently deployed crawlers)
    - **Schedule**: 3 times daily at 10:00 AM, 2:00 PM, 4:00 PM (Europe/Sofia timezone)
    - **Use case**: Long-term construction/repair projects from district municipalities
 
@@ -57,7 +57,9 @@ All crawlers run simultaneously, each invoking its respective Cloud Run job:
 - `crawl-sredec` → Sredec district WordPress site
 - `crawl-slatina` → Slatina district WordPress site
 - `crawl-lozenets` → Lozenets district WordPress site
-- `crawl-nimh` → NIMH severe weather warnings API
+- `crawl-raioniskar` → Raion Iskar municipality site
+- `crawl-rayon-pancharevo` → Rayon Pancharevo WordPress site
+- `crawl-nimh-severe-weather` → NIMH severe weather warnings API
 
 **Failure behavior**: Crawlers are wrapped in `try`/`except` blocks. If one fails, it logs an ERROR but doesn't stop other crawlers or the workflow.
 

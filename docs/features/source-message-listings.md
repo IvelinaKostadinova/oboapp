@@ -23,6 +23,9 @@ The source message listing feature provides dedicated pages for each data source
 - `studentski-bg` - Столична община, Район "Студентски"
 - `sredec-sofia-org` - Столична община, Район "Средец"
 - `so-slatina-org` - Столична община, Район "Слатина"
+- `lozenets-sofia-bg` - Столична община, Район "Лозенец"
+- `raioniskar-bg` - Столична община, Район "Искър"
+- `rayon-pancharevo-bg` - Столична община, Район "Панчарево"
 - `nimh-severe-weather` - НИМХ (Метеорологични предупреждения)
 
 ## Page Structure
