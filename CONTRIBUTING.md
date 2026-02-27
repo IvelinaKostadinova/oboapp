@@ -40,4 +40,10 @@ Each has its own `.env.local` configuration.
 2. Follow [AGENTS.md](AGENTS.md) patterns
 3. Add tests for new functionality
 4. Run `pnpm test:run` in both `web/` and `ingest/`
-5. Submit PR with clear description
+5. Run the dependency-cycle check locally:
+
+	```bash
+	pnpm dlx dpdm@3.14.0 --no-tree --no-warning --exit-code circular:1 "db/src/**/*.ts" "shared/src/**/*.ts" "ingest/**/*.ts" "web/**/*.{ts,tsx}"
+	```
+
+6. Submit PR with clear description
