@@ -59,7 +59,7 @@ All crawlers run simultaneously, each invoking its respective Cloud Run job:
 - `crawl-lozenets` → Lozenets district WordPress site
 - `crawl-raioniskar` → Raion Iskar municipality site
 - `crawl-rayon-pancharevo` → Rayon Pancharevo WordPress site
-- `crawl-nimh-severe-weather` → NIMH severe weather warnings API
+- `crawl-nimh-severe-weather` → NIMH severe weather warnings site
 
 **Failure behavior**: Crawlers are wrapped in `try`/`except` blocks. If one fails, it logs an ERROR but doesn't stop other crawlers or the workflow.
 
