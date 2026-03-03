@@ -2,6 +2,16 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { AuthProvider, useAuth } from "./auth-context";
 import type { Auth, User, UserCredential } from "firebase/auth";
+import {
+  PENDING_GUEST_UPGRADE_UID_KEY,
+  PENDING_GUEST_UPGRADE_TOKEN_KEY,
+} from "./auth-upgrade";
+
+const DEFAULT_AUTH_USER = {
+  uid: "anonymous-user-id",
+  isAnonymous: true,
+  getIdToken: vi.fn().mockResolvedValue("guest-token-proof"),
+} as User;
 
 // Mock Firebase Auth
 vi.mock("./firebase", () => ({
@@ -14,9 +24,10 @@ vi.mock("firebase/auth", async () => {
   return {
     ...actual,
     onAuthStateChanged: vi.fn((auth, callback) => {
-      callback(null);
+      callback(DEFAULT_AUTH_USER);
       return vi.fn();
     }),
+    signInAnonymously: vi.fn(),
     signInWithPopup: vi.fn(),
     GoogleAuthProvider: vi.fn(),
     signOut: vi.fn(),
@@ -28,7 +39,79 @@ describe("AuthContext", () => {
     vi.clearAllMocks();
   });
 
+  it("attempts anonymous sign-in when auth state is null", async () => {
+    const { onAuthStateChanged, signInAnonymously } =
+      await import("firebase/auth");
+    const mockOnAuthStateChanged = onAuthStateChanged as ReturnType<
+      typeof vi.fn
+    >;
+    const mockSignInAnonymously = signInAnonymously as ReturnType<typeof vi.fn>;
+
+    mockOnAuthStateChanged.mockImplementationOnce((auth, callback) => {
+      callback(null);
+      return vi.fn();
+    });
+    mockSignInAnonymously.mockResolvedValueOnce({ user: DEFAULT_AUTH_USER });
+
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <AuthProvider>{children}</AuthProvider>
+    );
+
+    renderHook(() => useAuth(), { wrapper });
+
+    await waitFor(() => {
+      expect(mockSignInAnonymously).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("signInWithGoogle", () => {
+    it("continues Google sign-in when guest upgrade proof storage fails", async () => {
+      const { onAuthStateChanged, signInWithPopup } =
+        await import("firebase/auth");
+      const mockOnAuthStateChanged = onAuthStateChanged as ReturnType<
+        typeof vi.fn
+      >;
+      const mockSignInWithPopup = signInWithPopup as ReturnType<typeof vi.fn>;
+
+      const guestUserWithTokenFailure = {
+        uid: "guest-token-failure-user",
+        isAnonymous: true,
+        getIdToken: vi.fn().mockRejectedValue(new Error("Token unavailable")),
+      } as User;
+
+      mockOnAuthStateChanged.mockImplementationOnce((auth, callback) => {
+        callback(guestUserWithTokenFailure);
+        return vi.fn();
+      });
+      mockSignInWithPopup.mockResolvedValueOnce({} as UserCredential);
+
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {
+        // no-op for test readability
+      });
+
+      const wrapper = ({ children }: { children: React.ReactNode }) => (
+        <AuthProvider>{children}</AuthProvider>
+      );
+
+      const { result } = renderHook(() => useAuth(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      await expect(result.current.signInWithGoogle()).resolves.toBeUndefined();
+
+      expect(mockSignInWithPopup).toHaveBeenCalledTimes(1);
+      expect(
+        globalThis.sessionStorage.getItem(PENDING_GUEST_UPGRADE_UID_KEY),
+      ).toBeNull();
+      expect(
+        globalThis.sessionStorage.getItem(PENDING_GUEST_UPGRADE_TOKEN_KEY),
+      ).toBeNull();
+
+      consoleSpy.mockRestore();
+    });
+
     it("should not throw error when user closes the popup", async () => {
       const { signInWithPopup } = await import("firebase/auth");
       const mockSignInWithPopup = signInWithPopup as ReturnType<typeof vi.fn>;
@@ -167,7 +250,9 @@ describe("AuthContext", () => {
       // Mock reauthenticateWithPopup dynamically
       vi.doMock("firebase/auth", async () => {
         const actual =
-          await vi.importActual<typeof import("firebase/auth")>("firebase/auth");
+          await vi.importActual<typeof import("firebase/auth")>(
+            "firebase/auth",
+          );
         return {
           ...actual,
           reauthenticateWithPopup: vi.fn().mockRejectedValue({
