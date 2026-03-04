@@ -17,35 +17,21 @@ pnpm install  # Execute in root. Installs dependencies for all modules (web, ing
 
 ### 2. Configure Environment Variables
 
-Copy the example environment file and set MSW mode:
+Copy the MSW environment file and set your Google Maps API key:
 
 ```bash
 cd web
-cp .env.example .env.local
+cp .env.example.msw .env.local
 ```
 
-Edit `web/.env.local` and set:
+Edit `web/.env.local` and fill in:
 
 ```bash
-# Enable Mock Service Worker (MSW)
-NEXT_PUBLIC_USE_MSW=true
-
-# Disable Firebase emulators
-NEXT_PUBLIC_USE_FIREBASE_EMULATORS=false
-
 # Google Maps API key (required for map display)
 NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your-api-key-here
-
-# Other required variables (can use dummy values for front-end work)
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-project
-NEXT_PUBLIC_FIREBASE_API_KEY=demo-api-key
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=demo-project.firebaseapp.com
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=demo-project.appspot.com
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=123456789
-NEXT_PUBLIC_FIREBASE_APP_ID=demo-app-id
 ```
 
-**Note**: For a Google Maps API key, create one at the [Google Cloud Console](https://console.cloud.google.com/google/maps-apis/overview). Enable the Maps JavaScript API and set restrictions for localhost.
+**Note**: For a Google Maps API key, create one at the [Google Cloud Console](https://console.cloud.google.com/google/maps-apis/overview). Enable the Maps JavaScript API and set restrictions for localhost. All other Firebase variables are automatically set to safe demo values in MSW mode.
 
 ### 3. Start Development Server
 

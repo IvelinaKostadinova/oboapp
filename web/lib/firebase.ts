@@ -7,8 +7,9 @@ import {
 import { getAuth, Auth, connectAuthEmulator } from "firebase/auth";
 
 const useEmulators = process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true";
+const useMsw = process.env.NEXT_PUBLIC_USE_MSW === "true";
 
-const firebaseConfig = useEmulators
+const firebaseConfig = useEmulators || useMsw
   ? {
       apiKey: "demo-api-key",
       authDomain: "demo-project.firebaseapp.com",

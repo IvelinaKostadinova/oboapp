@@ -37,6 +37,7 @@ firestore-debug.log
 .env*
 !.env.example
 !.env.example.emulator
+!.env.example.msw
 
 # vercel
 .vercel
