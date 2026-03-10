@@ -72,6 +72,11 @@ async function parseArguments(): Promise<IngestOptions> {
   return options;
 }
 
+function toDate(value: unknown): Date | undefined {
+  if (value instanceof Date) return value;
+  return value ? new Date(value as string) : undefined;
+}
+
 async function fetchSources(
   db: OboDb,
   options: IngestOptions,
@@ -99,13 +104,16 @@ async function fetchSources(
     title: data.title as string,
     message: data.message as string,
     sourceType: data.sourceType as string,
-    crawledAt: data.crawledAt instanceof Date ? data.crawledAt : new Date(data.crawledAt as string ?? Date.now()),
+    crawledAt:
+      data.crawledAt instanceof Date
+        ? data.crawledAt
+        : new Date((data.crawledAt as string) ?? Date.now()),
     geoJson: data.geoJson as string | GeoJSONFeatureCollection | undefined,
     markdownText: data.markdownText as string | undefined,
     categories: data.categories as string[] | undefined,
     isRelevant: data.isRelevant as boolean | undefined,
-    timespanStart: data.timespanStart instanceof Date ? data.timespanStart : (data.timespanStart ? new Date(data.timespanStart as string) : undefined),
-    timespanEnd: data.timespanEnd instanceof Date ? data.timespanEnd : (data.timespanEnd ? new Date(data.timespanEnd as string) : undefined),
+    timespanStart: toDate(data.timespanStart),
+    timespanEnd: toDate(data.timespanEnd),
     cityWide: data.cityWide as boolean | undefined,
     locality: data.locality as string | undefined,
     deepLinkUrl: data.deepLinkUrl as string | undefined,
@@ -130,10 +138,9 @@ async function getAlreadyIngestedSet(
   const { encodeDocumentId } = await import("../crawlers/shared/firestore");
   const sourceDocumentIds = sources.map((s) => encodeDocumentId(s.url));
 
-  const docs = await db.messages.findBySourceDocumentIds(
-    sourceDocumentIds,
-    ["sourceDocumentId"],
-  );
+  const docs = await db.messages.findBySourceDocumentIds(sourceDocumentIds, [
+    "sourceDocumentId",
+  ]);
 
   const alreadyIngestedIds = new Set<string>();
   for (const doc of docs) {
@@ -194,9 +201,9 @@ async function ingestSource(
   // sourceUrl carries the user-facing URL: use deepLinkUrl if explicitly set
   // (empty string = no user-facing link), otherwise fall back to source.url.
   const userFacingUrl =
-    source.deepLinkUrl !== undefined
-      ? source.deepLinkUrl || undefined
-      : source.url;
+    source.deepLinkUrl === undefined
+      ? source.url
+      : source.deepLinkUrl || undefined;
   const result = await messageIngest(source.message, source.sourceType, {
     precomputedGeoJson: geoJson,
     sourceUrl: userFacingUrl,
