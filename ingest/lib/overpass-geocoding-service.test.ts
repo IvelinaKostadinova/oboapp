@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-
-// Import helper functions for testing (they'll be exported from the service)
-// For now, we'll test them as if they were exported
-// You can export them from the service file or test them indirectly
+import {
+  normalizeStreetName,
+  toOverpassRegex,
+} from "./overpass-geocoding-service";
 
 describe("overpass-geocoding-service", () => {
   describe("parseOverpassError", () => {
@@ -177,6 +177,53 @@ describe("overpass-geocoding-service", () => {
         const error = new Error("Invalid Query Structure");
         expect(shouldTryFallback(error)).toBe(false);
       });
+    });
+  });
+
+  describe("normalizeStreetName", () => {
+    it("strips ул. prefix", () => {
+      expect(normalizeStreetName("ул. Оборище")).toBe("оборище");
+    });
+
+    it("strips бул. prefix", () => {
+      expect(normalizeStreetName("бул. Цар Освободител")).toBe(
+        "цар освободител",
+      );
+    });
+
+    it("strips ordinal suffix -ти from numbers", () => {
+      expect(normalizeStreetName("ул. 20-ти април")).toBe("20 април");
+    });
+
+    it("strips ordinal suffix -ви from numbers", () => {
+      expect(normalizeStreetName("ул. 21-ви януари")).toBe("21 януари");
+    });
+
+    it("strips ordinal suffix -ри from numbers", () => {
+      expect(normalizeStreetName("ул. 3-ти март")).toBe("3 март");
+    });
+
+    it("removes quote styles", () => {
+      expect(normalizeStreetName("ул. „Цар Самуил“")).toBe("цар самуил");
+    });
+  });
+
+  describe("toOverpassRegex", () => {
+    it("adds optional ordinal suffix after numbers (20 → matches 20-ти)", () => {
+      const regex = new RegExp(toOverpassRegex("20 април"), "i");
+      expect(regex.test("20 април")).toBe(true);
+      expect(regex.test("20-ти април")).toBe(true);
+      expect(regex.test("20-ви април")).toBe(true);
+    });
+
+    it("makes hyphens between letters flexible (matches both -  and  -  variants)", () => {
+      const regex = new RegExp(toOverpassRegex("данчов-зографина"), "i");
+      expect(regex.test("Георги Данчов - Зографина")).toBe(true);
+      expect(regex.test("Георги Данчов-Зографина")).toBe(true);
+    });
+
+    it("leaves plain street names unchanged", () => {
+      expect(toOverpassRegex("лайош кошут")).toBe("лайош кошут");
     });
   });
 });

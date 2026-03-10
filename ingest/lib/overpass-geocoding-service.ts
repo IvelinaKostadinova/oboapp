@@ -80,16 +80,34 @@ const OVERPASS_INSTANCES = [
 /**
  * Normalize street name for better OSM matching
  * - Removes street type prefixes (бул., ул., площад, пл.)
+ * - Removes Bulgarian ordinal suffixes from numbers (20-ти → 20, 3-ти → 3)
  * - Removes all quote styles (ASCII and Unicode)
  * - Normalizes whitespace
  */
-function normalizeStreetName(streetName: string): string {
+export function normalizeStreetName(streetName: string): string {
   return streetName
     .toLowerCase()
     .replaceAll(/^(бул\.|ул\.|площад|пл\.)\s*/g, "")
-    .replaceAll(/["""„"'`''‚«»‹›]/g, "") // Remove ALL quote styles
+    .replaceAll(/(?<=\d)-(?:ти|ви|и|ри|ма|то)(?=\s|$|[^а-яa-z])/gi, "") // Strip ordinal suffixes: 20-ти → 20
+    .replaceAll(/["\u201c\u201d\u201e'`\u2018\u2019\u201a«»‹›]/g, "") // Remove ALL quote styles
     .replaceAll(/\s+/g, " ") // Normalize whitespace
     .trim();
+}
+
+/**
+ * Convert a normalized street name into a flexible Overpass QL regex pattern.
+ * Handles OSM naming quirks:
+ * - Hyphen spacing: "Данчов-Зографина" query also matches OSM "Данчов - Зографина"
+ * - Ordinal suffixes: "20" query also matches OSM "20-ти", "20-ви", etc.
+ */
+export function toOverpassRegex(normalizedName: string): string {
+  return (
+    normalizedName
+      // Allow optional spaces around hyphens between letters
+      .replaceAll(/([а-яa-z])-([а-яa-z])/gi, "$1( ?- ?)$2")
+      // Allow optional ordinal suffix after numbers
+      .replaceAll(/(\d+)/g, "$1(-(ти|ви|и|ри|ма|то))?")
+  );
 }
 
 /**
@@ -102,6 +120,7 @@ async function getStreetGeometryFromOverpass(
   try {
     // Normalize street name for better OSM matching
     const normalizedName = normalizeStreetName(streetName);
+    const queryRegex = toOverpassRegex(normalizedName);
 
     // Check if this is a square/plaza (площад/пл.)
     const isSquare = streetName.toLowerCase().match(/^(площад|пл\.)\s*/);
@@ -120,10 +139,10 @@ async function getStreetGeometryFromOverpass(
       query = `
         [out:json][timeout:25];
         (
-          node["place"="square"]["name"~"${normalizedName}",i](${bbox});
-          way["place"="square"]["name"~"${normalizedName}",i](${bbox});
-          node["place"="square"]["name:bg"~"${normalizedName}",i](${bbox});
-          way["place"="square"]["name:bg"~"${normalizedName}",i](${bbox});
+          node["place"="square"]["name"~"${queryRegex}",i](${bbox});
+          way["place"="square"]["name"~"${queryRegex}",i](${bbox});
+          node["place"="square"]["name:bg"~"${queryRegex}",i](${bbox});
+          way["place"="square"]["name:bg"~"${queryRegex}",i](${bbox});
         );
         out geom;
       `;
@@ -137,8 +156,8 @@ async function getStreetGeometryFromOverpass(
       query = `
         [out:json][timeout:25];
         (
-          way${highwayFilter}["name"~"${normalizedName}",i](${bbox});
-          way${highwayFilter}["name:bg"~"${normalizedName}",i](${bbox});
+          way${highwayFilter}["name"~"${queryRegex}",i](${bbox});
+          way${highwayFilter}["name:bg"~"${queryRegex}",i](${bbox});
         );
         out geom;
       `;
