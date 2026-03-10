@@ -463,6 +463,43 @@ function findGeometricIntersection(
   }
 }
 
+async function geocodeSingleIntersection(
+  intersection: string,
+): Promise<Address | null> {
+  const [street1Name, street2Name] = intersection
+    .split("∩")
+    .map((s) => s.trim());
+
+  if (!street1Name || !street2Name) {
+    logger.error("Invalid intersection format", { intersection });
+    return null;
+  }
+
+  const geom1 = await getStreetGeometryFromOverpass(street1Name);
+  const geom2 = await getStreetGeometryFromOverpass(street2Name);
+
+  if (!geom1 || !geom2) {
+    return null;
+  }
+
+  const intersectionPoint = findGeometricIntersection(geom1, geom2);
+
+  if (!intersectionPoint) {
+    logger.error("Could not find intersection");
+    return null;
+  }
+
+  return {
+    originalText: intersection,
+    formattedAddress: intersection,
+    coordinates: { lat: intersectionPoint.lat, lng: intersectionPoint.lng },
+    geoJson: {
+      type: "Point",
+      coordinates: [intersectionPoint.lng, intersectionPoint.lat],
+    },
+  };
+}
+
 /**
  * Main geocoding function using Overpass API and Turf.js
  */
@@ -479,44 +516,9 @@ export async function overpassGeocodeIntersections(
 
   for (let i = 0; i < intersections.length; i++) {
     const intersection = intersections[i];
-
-    const [street1Name, street2Name] = intersection
-      .split("∩")
-      .map((s) => s.trim());
-
-    if (!street1Name || !street2Name) {
-      logger.error("Invalid intersection format", { intersection });
-      continue;
-    }
-
     try {
-      // Fetch geometries from Overpass
-      const geom1 = await getStreetGeometryFromOverpass(street1Name);
-      const geom2 = await getStreetGeometryFromOverpass(street2Name);
-
-      if (!geom1 || !geom2) {
-        continue;
-      }
-
-      // Find intersection
-      const intersectionPoint = findGeometricIntersection(geom1, geom2);
-
-      if (intersectionPoint) {
-        results.push({
-          originalText: intersection,
-          formattedAddress: intersection,
-          coordinates: {
-            lat: intersectionPoint.lat,
-            lng: intersectionPoint.lng,
-          },
-          geoJson: {
-            type: "Point",
-            coordinates: [intersectionPoint.lng, intersectionPoint.lat],
-          },
-        });
-      } else {
-        logger.error("Could not find intersection");
-      }
+      const result = await geocodeSingleIntersection(intersection);
+      if (result) results.push(result);
     } catch (error) {
       logger.error("Error processing intersection", {
         intersection,
@@ -729,7 +731,7 @@ export async function getStreetSectionGeometry(
  * - Normalizes whitespace
  */
 function normalizeAddressForNominatim(address: string): string {
-  return address.replace(/№\s*/g, "").replace(/\s+/g, " ").trim();
+  return address.replaceAll(/№\s*/g, "").replaceAll(/\s+/g, " ").trim();
 }
 
 /**
@@ -807,6 +809,25 @@ async function geocodeAddressWithNominatim(
   }
 }
 
+async function resolveSingleAddress(
+  address: string,
+): Promise<Coordinates | null> {
+  // Pattern: "ул. Name Number" or "бул. Name Number"
+  const hasNumber = /\d+/.test(address);
+
+  if (hasNumber) {
+    logger.info("Geocoding numbered address with Nominatim", { address });
+    return geocodeAddressWithNominatim(address);
+  }
+
+  // Use Overpass for street names (get center of street)
+  const geom = await getStreetGeometryFromOverpass(address);
+  if (!geom) return null;
+
+  const centerCoords = turf.center(geom).geometry.coordinates;
+  return { lat: centerCoords[1], lng: centerCoords[0] };
+}
+
 /**
  * Geocode individual addresses using Overpass API
  */
@@ -825,30 +846,7 @@ export async function overpassGeocodeAddresses(
     const address = addresses[i];
 
     try {
-      // Check if this is a specific address (contains number)
-      // Pattern: "ул. Name Number" or "бул. Name Number"
-      const hasNumber = /\d+/.test(address);
-
-      let coords: Coordinates | null = null;
-
-      if (hasNumber) {
-        // Use Nominatim for specific addresses with house numbers
-        logger.info("Geocoding numbered address with Nominatim", { address });
-        coords = await geocodeAddressWithNominatim(address);
-      } else {
-        // Use Overpass for street names (get center of street)
-        const geom = await getStreetGeometryFromOverpass(address);
-
-        if (geom) {
-          const centerPoint = turf.center(geom);
-          const centerCoords = centerPoint.geometry.coordinates;
-          coords = {
-            lat: centerCoords[1],
-            lng: centerCoords[0],
-          };
-        }
-      }
-
+      const coords = await resolveSingleAddress(address);
       if (coords) {
         results.push({
           originalText: address,
