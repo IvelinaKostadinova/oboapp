@@ -62,7 +62,6 @@
     "@types/react-dom": "^19",
     "@types/turndown": "^5.0.6",
     "@types/ua-parser-js": "^0.7.39",
-    "@vitejs/plugin-react": "^5.1.2",
     "@vitest/coverage-v8": "^4.0.15",
     "@vitest/ui": "^4.0.15",
     "eslint-config-next": "^16.0.10",
