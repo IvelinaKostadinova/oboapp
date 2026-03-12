@@ -8,7 +8,17 @@
  * AssertionValueFunction signature.
  */
 
-import type { AssertionValueFunctionContext, GradingResult } from "promptfoo";
+type AssertionValueFunctionContext = {
+  config?: {
+    value?: unknown;
+  };
+};
+
+type GradingResult = {
+  pass: boolean;
+  score: number;
+  reason: string;
+};
 
 /**
  * Validates that the output is valid JSON parseable by the FilterSplitResponseSchema.
