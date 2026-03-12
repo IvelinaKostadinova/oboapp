@@ -6,6 +6,8 @@ import { useAuth } from "@/lib/auth-context";
 import { trackEvent } from "@/lib/analytics";
 import { fetchWithAuth } from "@/lib/auth-fetch";
 
+const OFFLINE_ERROR = "Няма интернет връзка. Свържи се с интернет и опитай отново.";
+
 export function useInterests() {
   const { user, loading: authLoading } = useAuth();
   const [interests, setInterests] = useState<Interest[]>([]);
@@ -76,7 +78,7 @@ export function useInterests() {
       console.error("Error fetching interests:", err);
       // Check if offline
       if (!navigator.onLine) {
-        setError("Няма интернет връзка. Моля, свържете се към интернет.");
+        setError(OFFLINE_ERROR);
       } else {
         setError(
           err instanceof Error ? err.message : "Failed to load interests",
@@ -141,9 +143,7 @@ export function useInterests() {
         console.error("Error adding interest:", err);
         // Provide helpful error message for offline state
         if (!navigator.onLine) {
-          throw new Error(
-            "Няма интернет връзка. Моля, свържете се към интернет и опитайте отново.",
-          );
+          throw new Error(OFFLINE_ERROR);
         }
         throw err;
       }
@@ -151,7 +151,6 @@ export function useInterests() {
     [user],
   );
 
-  // Update an existing interest (move or change radius)
   const updateInterest = useCallback(
     async (
       id: string,
@@ -188,9 +187,7 @@ export function useInterests() {
         console.error("Error updating interest:", err);
         // Provide helpful error message for offline state
         if (!navigator.onLine) {
-          throw new Error(
-            "Няма интернет връзка. Моля, свържете се към интернет и опитайте отново.",
-          );
+          throw new Error(OFFLINE_ERROR);
         }
         throw err;
       }
@@ -225,9 +222,7 @@ export function useInterests() {
         console.error("Error deleting interest:", err);
         // Provide helpful error message for offline state
         if (!navigator.onLine) {
-          throw new Error(
-            "Няма интернет връзка. Моля, свържете се към интернет и опитайте отново.",
-          );
+          throw new Error(OFFLINE_ERROR);
         }
         throw err;
       }
