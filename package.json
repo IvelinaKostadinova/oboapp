@@ -7,8 +7,8 @@
     "build:shared": "pnpm --filter @oboapp/shared build",
     "build:db": "pnpm --filter @oboapp/db build",
     "build:all": "pnpm build:shared && pnpm build:db && pnpm --filter oboapp-ingest build && pnpm --filter oboapp-web build",
-    "test:all": "pnpm --filter '*' test:run --if-present",
-    "lint:all": "pnpm --filter '*' lint --if-present",
+    "test:all": "pnpm -r --if-present --filter '*' run test:run",
+    "lint:all": "pnpm -r --if-present --filter '*' run lint",
     "postinstall": "pnpm build:shared && pnpm build:db",
     "prepare": "husky"
   },

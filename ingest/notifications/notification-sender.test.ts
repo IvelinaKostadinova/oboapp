@@ -31,7 +31,7 @@ function createMockMessaging(sendBehavior?: () => Promise<string>) {
 }
 
 function createMockDb() {
-  return {} as unknown as import("firebase-admin/firestore").Firestore;
+  return {} as unknown as import("@oboapp/db").OboDb;
 }
 
 describe("notification-sender", () => {
