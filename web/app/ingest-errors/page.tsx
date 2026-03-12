@@ -6,10 +6,78 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import MessageCard, { MessageCardSkeleton } from "@/components/MessageCard";
 import MessageDetailView from "@/components/MessageDetailView/MessageDetailView";
-import type { InternalMessage } from "@/lib/types";
+import GitHubIcon from "@/components/icons/GitHubIcon";
+import type { InternalMessage, IngestError } from "@/lib/types";
 import { navigateBackOrReplace } from "@/lib/navigation-utils";
 
 const PAGE_SIZE = 12;
+
+const GITHUB_REPO = "vbuch/oboapp";
+const BASE_URL =
+  process.env.NEXT_PUBLIC_BASE_URL ?? "https://oboapp.online";
+const MAX_URL_LENGTH = 8000;
+const MAX_INGEST_ERRORS_IN_GITHUB_BODY = 20;
+
+function buildGitHubIssueUrl(message: InternalMessage): string {
+  const messageUrl = `${BASE_URL}/ingest-errors?messageId=${encodeURIComponent(String(message.id))}`;
+  const rawErrors = message.ingestErrors ?? [];
+  const limitedErrors = rawErrors.slice(0, MAX_INGEST_ERRORS_IN_GITHUB_BODY);
+
+  // Escape sequences of 3+ backticks in error text so they don't close the code fence
+  const escapeBackticks = (text: string) =>
+    text.replace(/`{3,}/g, (m) => m.split("").join("\u200B"));
+
+  let errorsContent = limitedErrors
+    .map((e: IngestError) => `- [${e.type}] ${escapeBackticks(e.text)}`)
+    .join("\n");
+
+  if (rawErrors.length > limitedErrors.length) {
+    const remaining = rawErrors.length - limitedErrors.length;
+    const suffixLine = `- ... (${remaining} more error${remaining === 1 ? "" : "s"} truncated)`;
+    errorsContent = errorsContent ? `${errorsContent}\n${suffixLine}` : suffixLine;
+  }
+
+  const title = `Ingest error: ${message.id}`;
+  const header = `**Съобщение:** ${messageUrl}\n\n**Проблеми при обработка:**\n`;
+  const openFence = "```\n";
+  const closeFence = "\n```";
+
+  const buildUrl = (issueBody: string) =>
+    `https://github.com/${GITHUB_REPO}/issues/new?${new URLSearchParams({ title, body: issueBody })}`;
+
+  const buildBody = (content: string) => `${header}${openFence}${content}${closeFence}`;
+
+  if (buildUrl(buildBody(errorsContent)).length <= MAX_URL_LENGTH) {
+    return buildUrl(buildBody(errorsContent));
+  }
+
+  // Truncate only the errors content so the code fence is always properly closed
+  const truncSuffix = "\n(truncated)" + closeFence;
+  let low = 0;
+  let high = errorsContent.length;
+  let bestContent = truncSuffix;
+
+  while (low <= high) {
+    let mid = Math.floor((low + high) / 2);
+    // Never cut through a surrogate pair (non-BMP character)
+    if (mid > 0 && mid < errorsContent.length) {
+      const prevCode = errorsContent.charCodeAt(mid - 1);
+      const nextCode = errorsContent.charCodeAt(mid);
+      if (prevCode >= 0xd800 && prevCode <= 0xdbff && nextCode >= 0xdc00 && nextCode <= 0xdfff) {
+        mid -= 1;
+      }
+    }
+    const candidate = errorsContent.slice(0, mid) + truncSuffix;
+    if (buildUrl(`${header}${openFence}${candidate}`).length <= MAX_URL_LENGTH) {
+      bestContent = candidate;
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+
+  return buildUrl(`${header}${openFence}${bestContent}`);
+}
 
 type IngestErrorsCursor = {
   finalizedAt: string;
@@ -131,18 +199,23 @@ export default function IngestErrorsPage() {
             ))}
 
           {!isLoading &&
-            messages.map((message) => (
-              <MessageCard
-                key={message.id}
-                message={message}
-                onClick={handleMessageClick}
-              >
-                {message.ingestErrors && message.ingestErrors.length > 0 && (
-                  <div className="mt-auto pt-4">
-                    <div className="rounded-md border border-error-border bg-error-light text-error p-3 text-xs space-y-2">
+            messages.map((message) => {
+              const ingestErrors = message.ingestErrors ?? [];
+              const hasErrors = ingestErrors.length > 0;
+              return (
+                <div key={message.id} className="flex flex-col">
+                  <MessageCard
+                    message={message}
+                    onClick={handleMessageClick}
+                    className={
+                      hasErrors ? "rounded-b-none border-b-0" : undefined
+                    }
+                  />
+                  {hasErrors && (
+                    <div className="rounded-b-lg border border-t-0 border-error-border bg-error-light text-error p-3 text-xs space-y-2">
                       <p className="font-semibold">Проблеми при обработка</p>
                       <ul className="list-disc list-inside space-y-1">
-                        {message.ingestErrors.map((error, index) => (
+                        {ingestErrors.map((error, index) => (
                           <li
                             key={`${error.type}-${index}`}
                             className="break-words"
@@ -151,11 +224,22 @@ export default function IngestErrorsPage() {
                           </li>
                         ))}
                       </ul>
+                      <div className="pt-1">
+                        <a
+                          href={buildGitHubIssueUrl(message)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 text-xs font-medium text-error hover:underline"
+                        >
+                          <GitHubIcon className="size-4 shrink-0" />
+                          Създай issue в GitHub
+                        </a>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </MessageCard>
-            ))}
+                  )}
+                </div>
+              );
+            })}
 
           {isEmpty && (
             <div className="col-span-full text-center text-neutral py-8">
