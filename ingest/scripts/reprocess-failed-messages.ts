@@ -64,11 +64,17 @@ function parseTimestamp(value: unknown): Date | undefined {
   return value ? new Date(value as string) : undefined;
 }
 
+interface SourceResult {
+  created: number;
+  withGeoJson: number;
+  stillFailed: number;
+}
+
 async function processSource(
   db: OboDb,
   sourceDocumentId: string,
   msgs: MsgDoc[],
-): Promise<void> {
+): Promise<SourceResult> {
   console.log(`\n─── Source: ${sourceDocumentId}`);
   for (const m of msgs) {
     const snippet = ((m.text ?? m.plainText ?? "") as string).slice(0, 80);
@@ -77,20 +83,18 @@ async function processSource(
 
   const source = await db.sources.findById(sourceDocumentId);
   if (!source) {
-    console.warn(`  ⚠️  Source document not found — skipping`);
-    return;
+    throw new Error(`Source document not found`);
   }
 
   if (!source.locality) {
-    console.warn(`  ⚠️  Source missing locality field — skipping`);
-    return;
+    throw new Error(`Source missing locality field`);
   }
 
   if (DRY_RUN) {
     console.log(
       `  [dry-run] Would delete ${msgs.length} message(s) and re-ingest from "${source.sourceType as string}"`,
     );
-    return;
+    return { created: 0, withGeoJson: 0, stillFailed: 0 };
   }
 
   // Fetch ALL messages with this sourceDocumentId (may include successful siblings
@@ -154,23 +158,39 @@ async function processSource(
     },
   );
 
-  const created = result.messages.map((m) => m.id).join(", ");
+  const withGeoJson = result.messages.filter(
+    (m) => m.geoJson && m.geoJson.features.length > 0,
+  ).length;
+  const stillFailed = result.messages.length - withGeoJson;
+
+  const createdIds = result.messages.map((m) => m.id).join(", ");
   console.log(
-    `  ✅ Done — created ${result.messages.length} message(s): ${created}`,
+    `  ✅ Done — created ${result.messages.length} message(s): ${createdIds}`,
   );
+  console.log(
+    `     GeoJSON: ${withGeoJson} got geometry, ${stillFailed} still without`,
+  );
+
+  return { created: result.messages.length, withGeoJson, stillFailed };
 }
 
 async function main() {
   const { getDb } = await import("../lib/db");
   const db = await getDb();
 
-  console.log(`\n🔍 Fetching finalized messages without GeoJSON...\n`);
+  const daysBack = Number(
+    process.argv.find((a) => a.startsWith("--days="))?.split("=")[1] ?? "14",
+  );
+  const since = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
 
-  // Same query as the ingest-errors API route
+  console.log(
+    `\n🔍 Fetching finalized messages without GeoJSON (last ${daysBack} days, since ${since.toISOString().slice(0, 10)})...\n`,
+  );
+
   const allFinalized = await db.messages.findMany({
-    where: [{ field: "finalizedAt", op: ">", value: new Date(0) }],
+    where: [{ field: "finalizedAt", op: ">", value: since }],
     orderBy: [{ field: "finalizedAt", direction: "desc" }],
-    limit: 500,
+    limit: 1000,
   });
 
   const failed = allFinalized.filter(isFailedMessage);
@@ -185,16 +205,49 @@ async function main() {
     `Found ${failed.length} failed message(s) across ${bySource.size} source(s)\n`,
   );
 
+  const stats = {
+    attempted: 0,
+    succeeded: 0,
+    failed: 0,
+    messagesCreated: 0,
+    messagesWithGeoJson: 0,
+    messagesStillFailed: 0,
+  };
+
   for (const [sourceDocumentId, msgs] of bySource) {
-    await processSource(db, sourceDocumentId, msgs);
+    if (!DRY_RUN) stats.attempted++;
+    try {
+      const result = await processSource(db, sourceDocumentId, msgs);
+      if (!DRY_RUN) {
+        stats.succeeded++;
+        stats.messagesCreated += result.created;
+        stats.messagesWithGeoJson += result.withGeoJson;
+        stats.messagesStillFailed += result.stillFailed;
+      }
+    } catch (err) {
+      if (!DRY_RUN) stats.failed++;
+      console.error(
+        `  ❌ Failed for source ${sourceDocumentId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   if (DRY_RUN) {
     console.log(
-      `\n⚠️  DRY RUN — no changes made. Re-run with --execute to apply.\n`,
+      `\n⚠️  DRY RUN — no changes made. Re-run with --execute to apply.`,
+    );
+    console.log(
+      `\nSummary (dry-run): Would attempt: ${bySource.size} (window: last ${daysBack} days)\n`,
     );
   } else {
-    console.log(`\n✅ Re-processing complete.\n`);
+    console.log(`\n${"-".repeat(45)}`);
+    console.log(
+      `Sources  — Attempted: ${stats.attempted} | Succeeded: ${stats.succeeded} | Failed: ${stats.failed}`,
+    );
+    console.log(
+      `Messages — Created: ${stats.messagesCreated} | Got GeoJSON: ${stats.messagesWithGeoJson} | Still failed: ${stats.messagesStillFailed}`,
+    );
+    console.log(`${"-".repeat(45)}\n`);
   }
 }
 
