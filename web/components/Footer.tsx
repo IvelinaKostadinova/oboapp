@@ -79,7 +79,7 @@ export default function Footer({ className = "" }: FooterProps) {
             >
               Отворен код
             </a>
-            , разработен в Оборище с ❤️ за София.
+            с ❤️ за София.
           </p>
         </div>
       </div>
