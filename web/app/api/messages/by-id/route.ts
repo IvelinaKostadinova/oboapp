@@ -4,8 +4,20 @@ import { isValidMessageId } from "@oboapp/shared";
 import { recordToMessage } from "@/lib/doc-to-message";
 
 /**
+ * Strip a trailing split-index suffix (e.g. "-1", "-2") from a
+ * source-document-style ID so we can query by sourceDocumentId.
+ */
+function stripSplitSuffix(id: string): string {
+  return id.replace(/-\d+$/, "");
+}
+
+/**
  * Fetch a message by its ID.
- * Supports /m/{id} external URLs via the redirect in /m/[id]/page.tsx.
+ *
+ * Primary lookup: 8-char alphanumeric message ID (used in /m/{id} URLs).
+ * Fallback lookup: sourceDocumentId (base64-encoded source URL, optionally
+ * with a "-N" split-index suffix) — supports legacy and external callers
+ * that reference messages by their source document identifier.
  */
 export async function GET(request: Request) {
   try {
@@ -19,20 +31,26 @@ export async function GET(request: Request) {
       );
     }
 
-    if (!isValidMessageId(id)) {
-      return NextResponse.json({ error: "Invalid id format" }, { status: 400 });
-    }
-
     const db = await getDb();
-    const doc = await db.messages.findById(id);
 
-    if (!doc) {
+    // Primary: look up by 8-char message ID
+    if (isValidMessageId(id)) {
+      const doc = await db.messages.findById(id);
+      if (doc) {
+        return NextResponse.json({ message: recordToMessage(doc) });
+      }
       return NextResponse.json({ error: "Message not found" }, { status: 404 });
     }
 
-    const message = recordToMessage(doc);
+    // Fallback: treat the id as a sourceDocumentId (strip optional "-N" suffix)
+    const sourceDocId = stripSplitSuffix(id);
+    const docs = await db.messages.findBySourceDocumentIds([sourceDocId]);
 
-    return NextResponse.json({ message });
+    if (docs.length > 0) {
+      return NextResponse.json({ message: recordToMessage(docs[0]) });
+    }
+
+    return NextResponse.json({ error: "Message not found" }, { status: 404 });
   } catch (error) {
     console.error("Error fetching message by id:", error);
     return NextResponse.json(
