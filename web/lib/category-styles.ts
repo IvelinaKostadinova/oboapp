@@ -7,7 +7,7 @@
 import {
   Droplets,
   Zap,
-  Flame,
+  Heater,
   Trash2,
   CarFront,
   CircleSlash,
@@ -55,7 +55,7 @@ export const CATEGORY_STYLES: Record<
     bgColor: "#fef9c3", // yellow-100
   },
   heating: {
-    icon: Flame,
+    icon: Heater,
     color: "#dc2626", // red-600
     bgColor: "#fee2e2", // red-100
   },
