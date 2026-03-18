@@ -206,6 +206,14 @@ describe("overpass-geocoding-service", () => {
     it("removes quote styles", () => {
       expect(normalizeStreetName("ул. „Цар Самуил“")).toBe("цар самуил");
     });
+
+    it("inserts spaces after dots in consecutive abbreviations: Г.С.Раковски", () => {
+      expect(normalizeStreetName("ул. Г.С.Раковски")).toBe("г. с. раковски");
+    });
+
+    it("preserves already-spaced abbreviations", () => {
+      expect(normalizeStreetName("ул. Г. С. Раковски")).toBe("г. с. раковски");
+    });
   });
 
   describe("toOverpassRegex", () => {
@@ -237,7 +245,13 @@ describe("overpass-geocoding-service", () => {
     it("expands single-letter abbreviation in the middle: михаил д. скобелев matches Михаил Дмитриевич Скобелев", () => {
       const regex = new RegExp(toOverpassRegex("михаил д. скобелев"), "i");
       expect(regex.test("Михаил Дмитриевич Скобелев")).toBe(true);
-      expect(regex.test("Михаил Д. Скобелев")).toBe(false); // abbreviated form not matched (dot consumed)
+      expect(regex.test("Михаил Д. Скобелев")).toBe(true); // also matches abbreviated OSM form
+    });
+
+    it("expands consecutive abbreviations: г. с. раковски matches Георги С. Раковски", () => {
+      const regex = new RegExp(toOverpassRegex("г. с. раковски"), "i");
+      expect(regex.test("Георги С. Раковски")).toBe(true); // OSM format
+      expect(regex.test("Георги Стефанов Раковски")).toBe(true); // fully expanded
     });
 
     it("does not expand multi-letter abbreviations (ген. stays literal)", () => {

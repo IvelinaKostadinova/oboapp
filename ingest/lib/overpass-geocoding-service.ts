@@ -90,6 +90,7 @@ export function normalizeStreetName(streetName: string): string {
     .replaceAll(/^(бул\.|ул\.|площад|пл\.)\s*/g, "")
     .replaceAll(/(?<=\d)-(?:ти|ви|и|ри|ма|то)(?=\s|$|[^а-яa-z])/gi, "") // Strip ordinal suffixes: 20-ти → 20
     .replaceAll(/["\u201c\u201d\u201e'`\u2018\u2019\u201a«»‹›]/g, "") // Remove ALL quote styles
+    .replaceAll(/\.([а-яa-z])/gi, ". $1") // Space after dot-letter: Г.С.Раковски → Г. С. Раковски
     .replaceAll(/\s+/g, " ") // Normalize whitespace
     .trim();
 }
@@ -108,9 +109,11 @@ export function toOverpassRegex(normalizedName: string): string {
       .replaceAll(/([а-яa-z])-([а-яa-z])/gi, "$1( ?- ?)$2")
       // Allow optional ordinal suffix after numbers
       .replaceAll(/(\d+)/g, "$1(-(ти|ви|и|ри|ма|то))?")
-      // Expand single-letter abbreviations: "к. пейчинович" → "к[а-яa-z]* пейчинович"
+      // Expand single-letter abbreviations: "к. пейчинович" → "к[а-яa-z]*\.? пейчинович"
       // Only expands a single letter followed by ". " (not multi-letter abbreviations like "ген.")
-      .replaceAll(/(^| )([а-яa-z])\. /gi, "$1$2[\u0430-\u044fa-z]* ")
+      // Uses lookahead (?= ) so consecutive abbreviations like "г. с." both get expanded
+      // Optional dot (\.?) allows matching both full and abbreviated OSM names (e.g. "Георги С. Раковски")
+      .replaceAll(/(^| )([а-яa-z])\.(?= )/gi, "$1$2[\u0430-\u044fa-z]*\\.?")
   );
 }
 
