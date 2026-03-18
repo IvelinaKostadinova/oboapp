@@ -2,8 +2,9 @@ import { GoogleGenAI } from "@google/genai";
 import { delay } from "./delay";
 import { logger } from "./logger";
 
-const EMBEDDING_MODEL =
-  process.env.GOOGLE_EMBEDDING_MODEL || "gemini-embedding-001";
+const EMBEDDING_MODEL = (
+  process.env.GOOGLE_EMBEDDING_MODEL || "gemini-embedding-001"
+).trim();
 const EMBEDDING_DIMENSIONS = 768;
 const RATE_LIMIT_MS = 200;
 

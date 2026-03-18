@@ -43,7 +43,7 @@ export function validateModelConfig(
   ingestErrors?: IngestErrorRecorder,
 ): ModelConfigValidation {
   const recorder = getIngestErrorRecorder(ingestErrors);
-  const model = process.env.GOOGLE_AI_MODEL;
+  const model = process.env.GOOGLE_AI_MODEL?.trim();
 
   if (!model) {
     recorder.error("GOOGLE_AI_MODEL environment variable is not set");
