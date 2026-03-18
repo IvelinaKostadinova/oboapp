@@ -11,8 +11,25 @@ import { logger } from "@/lib/logger";
  * - Score >= MATCH_THRESHOLD (0.70): auto-match
  * - Score in [LLM_VERIFY_LOWER, MATCH_THRESHOLD) (0.55–0.70): ask LLM to verify
  * - Score < LLM_VERIFY_LOWER (0.55): no match
- * Returns the event and its match score, or null if no match.
+ *
+ * Returns a {@link FindBestMatchOutput} object containing:
+ * - `match`: a {@link FindBestMatchResult} with the matched event and its score,
+ *   or `null` if no match is selected.
+ * - `candidateCount`: the total number of candidate events considered (always present,
+ *   even when `match` is `null`).
  */
+export interface FindBestMatchResult {
+  event: Record<string, unknown>;
+  score: number;
+  signals: MatchSignals;
+  llmVerified?: boolean;
+}
+
+export interface FindBestMatchOutput {
+  match: FindBestMatchResult | null;
+  candidateCount: number;
+}
+
 export async function findBestMatch(
   db: OboDb,
   message: {
@@ -27,15 +44,10 @@ export async function findBestMatch(
     plainText?: string;
     streets?: Array<{ street: string }>;
   },
-): Promise<{
-  event: Record<string, unknown>;
-  score: number;
-  signals: MatchSignals;
-  llmVerified?: boolean;
-} | null> {
+): Promise<FindBestMatchOutput> {
   const candidates = await findCandidateEvents(db, message);
 
-  if (candidates.length === 0) return null;
+  if (candidates.length === 0) return { match: null, candidateCount: 0 };
 
   let bestMatch: {
     event: Record<string, unknown>;
@@ -68,11 +80,11 @@ export async function findBestMatch(
     }
   }
 
-  if (!bestMatch) return null;
+  if (!bestMatch) return { match: null, candidateCount: candidates.length };
 
   // High-confidence match — auto-attach
   if (bestMatch.score >= MATCH_THRESHOLD) {
-    return bestMatch;
+    return { match: bestMatch, candidateCount: candidates.length };
   }
 
   // Uncertain zone (LLM_VERIFY_LOWER to MATCH_THRESHOLD) — ask LLM
@@ -87,7 +99,7 @@ export async function findBestMatch(
       hasMessageText: Boolean(messageText),
       hasEventText: Boolean(eventText),
     });
-    return null;
+    return { match: null, candidateCount: candidates.length };
   }
 
   const locationContext = buildLocationContext(message, bestMatch.event);
@@ -105,7 +117,7 @@ export async function findBestMatch(
       score: bestMatch.score,
       reasoning: llmResult.reasoning,
     });
-    return { ...bestMatch, llmVerified: true };
+    return { match: { ...bestMatch, llmVerified: true }, candidateCount: candidates.length };
   }
 
   // LLM rejected or failed — treat as no match (conservative)
@@ -114,7 +126,7 @@ export async function findBestMatch(
     reasoning: llmResult?.reasoning ?? "LLM call failed",
     isSameEvent: llmResult?.isSameEvent,
   });
-  return null;
+  return { match: null, candidateCount: candidates.length };
 }
 
 function buildLocationContext(

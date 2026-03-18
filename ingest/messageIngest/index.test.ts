@@ -398,6 +398,7 @@ describe("event matching after finalization", () => {
       eventId: "evt-1",
       action: "created",
       confidence: 1.0,
+      candidateCount: 0,
     });
     mockDeleteOne.mockResolvedValue(undefined);
   });
@@ -411,7 +412,17 @@ describe("event matching after finalization", () => {
     expect(mockProcessEventMatching).toHaveBeenCalledOnce();
     // Verify eventId is stored on the message
     expect(mockUpdateMessage).toHaveBeenCalledWith("test-msg-id", {
-      eventId: "evt-1",
+      $set: { eventId: "evt-1" },
+      $addToSet: {
+        process: expect.objectContaining({
+          step: "eventMatching",
+          summary: expect.objectContaining({
+            success: true,
+            eventId: "evt-1",
+            action: "created",
+          }),
+        }),
+      },
     });
   });
 
@@ -442,5 +453,77 @@ describe("event matching after finalization", () => {
     // Pipeline should complete successfully despite event matching failure
     expect(result.messages).toHaveLength(1);
     expect(result.totalRelevant).toBe(1);
+
+    // Verify error audit was recorded with both process and ingestErrors
+    expect(mockUpdateMessage).toHaveBeenCalledWith(
+      "test-msg-id",
+      expect.objectContaining({
+        $addToSet: expect.objectContaining({
+          process: expect.objectContaining({
+            step: "eventMatching",
+            summary: expect.objectContaining({
+              success: false,
+              error: "matching failed",
+            }),
+          }),
+          ingestErrors: expect.objectContaining({
+            text: expect.any(String),
+            type: "error",
+          }),
+        }),
+      }),
+    );
+  });
+
+  it("stores embedding success audit when embedding is generated", async () => {
+    const { generateEmbedding } = await import("@/lib/embeddings");
+    vi.mocked(generateEmbedding).mockResolvedValueOnce(
+      Array.from({ length: 768 }, () => 0.1),
+    );
+
+    await messageIngest("test text", "toplo-bg", {
+      precomputedGeoJson: PRECOMPUTED_GEOJSON,
+      locality: "bg.sofia",
+    });
+
+    // Verify embedding stored with audit trail
+    expect(mockUpdateMessage).toHaveBeenCalledWith(
+      "test-msg-id",
+      expect.objectContaining({
+        $set: { embedding: expect.any(Array) },
+        $addToSet: {
+          process: expect.objectContaining({
+            step: "embedding",
+            summary: expect.objectContaining({
+              success: true,
+              dimensions: 768,
+            }),
+          }),
+        },
+      }),
+    );
+  });
+
+  it("stores embedding null-result audit when embedding returns null", async () => {
+    await messageIngest("test text", "toplo-bg", {
+      precomputedGeoJson: PRECOMPUTED_GEOJSON,
+      locality: "bg.sofia",
+    });
+
+    // Default mock returns null — verify null result audit
+    expect(mockUpdateMessage).toHaveBeenCalledWith(
+      "test-msg-id",
+      expect.objectContaining({
+        $addToSet: {
+          process: expect.objectContaining({
+            step: "embedding",
+            summary: expect.objectContaining({
+              success: false,
+              reason: "null result",
+            }),
+          }),
+        },
+      }),
+    );
   });
 });
