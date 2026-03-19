@@ -1,13 +1,11 @@
 import { Address } from "./types";
-import {
-  isCenterFallback,
-  isGenericCityAddress,
-} from "./geocoding-utils";
+import { isCenterFallback, isGenericCityAddress } from "./geocoding-utils";
 import { isWithinBounds } from "@oboapp/shared";
 import { getLocality } from "./target-locality";
 import { delay } from "./delay";
 import { logger } from "@/lib/logger";
 import { GoogleGeocodingMockService } from "../__mocks__/services/google-geocoding-mock-service";
+import { overpassGeocodeAddresses } from "./overpass-geocoding-service";
 
 // Check if mocking is enabled
 const USE_MOCK = process.env.MOCK_GOOGLE_GEOCODING === "true";
@@ -42,13 +40,20 @@ export async function geocodeAddress(address: string): Promise<Address | null> {
 
         // Reject results that match city center exactly (Google's fallback)
         if (isCenterFallback(lat, lng)) {
-          logger.warn("Result is city center generic fallback, rejecting", { address, lat: lat.toFixed(6), lng: lng.toFixed(6) });
+          logger.warn("Result is city center generic fallback, rejecting", {
+            address,
+            lat: lat.toFixed(6),
+            lng: lng.toFixed(6),
+          });
           continue;
         }
 
         // Reject generic city-level addresses (e.g., "Sofia, Bulgaria")
         if (isGenericCityAddress(formattedAddress)) {
-          logger.warn("Rejecting generic address", { address, formattedAddress });
+          logger.warn("Rejecting generic address", {
+            address,
+            formattedAddress,
+          });
           continue;
         }
 
@@ -64,17 +69,27 @@ export async function geocodeAddress(address: string): Promise<Address | null> {
             },
           };
         }
-        logger.warn("Result is outside locality boundaries", { address, locality, lat: lat.toFixed(6), lng: lng.toFixed(6) });
+        logger.warn("Result is outside locality boundaries", {
+          address,
+          locality,
+          lat: lat.toFixed(6),
+          lng: lng.toFixed(6),
+        });
       }
 
       // All results were outside the locality's boundaries
-      logger.warn("No results found within locality boundaries", { address, locality });
+      logger.warn("No results found within locality boundaries", {
+        address,
+        locality,
+      });
       return null;
     }
 
     return null;
   } catch (error) {
-    logger.error("Error geocoding address", { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error geocoding address", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 }
@@ -83,6 +98,7 @@ export async function geocodeAddresses(
   addresses: string[],
 ): Promise<Address[]> {
   const geocodedAddresses: Address[] = [];
+  const failedAddresses: string[] = [];
 
   for (const address of addresses) {
     const geocoded = await geocodeAddress(address);
@@ -90,10 +106,54 @@ export async function geocodeAddresses(
     if (geocoded) {
       geocodedAddresses.push(geocoded);
     } else {
-      logger.warn("Failed to geocode address", { address });
+      logger.info(
+        "Failed to geocode address via Google; will try OSM fallback",
+        { address },
+      );
+      failedAddresses.push(address);
     }
     // Add a small delay to avoid hitting rate limits
     await delay(GEOCODING_BATCH_DELAY_MS);
+  }
+
+  // Fallback: try OSM/Overpass for addresses that Google couldn't resolve
+  if (failedAddresses.length > 0) {
+    logger.info("Attempting OSM/Overpass fallback for failed addresses", {
+      count: failedAddresses.length,
+    });
+    const overpassResults = await overpassGeocodeAddresses(failedAddresses);
+
+    const locality = getLocality();
+    const boundedOverpassResults = overpassResults.filter((result) => {
+      const within = isWithinBounds(
+        locality,
+        result.coordinates.lat,
+        result.coordinates.lng,
+      );
+      if (!within) {
+        logger.warn("Dropping OSM/Overpass result outside locality bounds", {
+          address: result.originalText,
+          lat: result.coordinates.lat,
+          lng: result.coordinates.lng,
+        });
+      }
+      return within;
+    });
+
+    geocodedAddresses.push(...boundedOverpassResults);
+
+    const overpassResolved = new Set(
+      boundedOverpassResults.map((r) => r.originalText),
+    );
+    const stillFailedAddresses = failedAddresses.filter(
+      (a) => !overpassResolved.has(a),
+    );
+    if (stillFailedAddresses.length > 0) {
+      logger.warn("Addresses failed both Google and OSM/Overpass fallback", {
+        count: stillFailedAddresses.length,
+        addresses: stillFailedAddresses,
+      });
+    }
   }
 
   return geocodedAddresses;

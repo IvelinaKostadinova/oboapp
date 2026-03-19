@@ -66,3 +66,48 @@ tests:
     assert:
       - type: javascript
         value: "file://assertions.ts:assertHasLocations"
+
+  # Housing complex blocks (ж.к. Дружба, бл. 66/91/88)
+  - vars:
+      input: "file://../__mocks__/fixtures/sources/housing-complex-blocks.md"
+    assert:
+      - type: javascript
+        value: "file://assertions.ts:assertWithSpecificAddress"
+        config:
+          value: "true"
+      - type: javascript
+        value: "file://assertions.ts:assertHasLocations"
+      - type: javascript
+        value: "file://assertions.ts:assertMinPinCount"
+        config:
+          value: 3
+      - type: javascript
+        value: |
+          (output) => {
+            const data = typeof output === 'string' ? JSON.parse(output) : output;
+            const pins = Array.isArray(data?.pins) ? data.pins : [];
+
+            const positionalPattern = /(?:^|[\s,.])(до|пред|зад|срещу|при|между)(?:[\s,.]|$)/;
+            const normalizedPattern = /^бл\.\s*\d+,\s*ж\.к\. .+/;
+
+            for (const pin of pins) {
+              if (!pin || typeof pin.address !== 'string' || !pin.address.trim()) {
+                throw new Error('Every pin must have a non-empty address string');
+              }
+
+              const addrLower = pin.address.toLowerCase();
+              if (positionalPattern.test(addrLower)) {
+                throw new Error(
+                  `Unnormalized positional wording found in pin address: "${pin.address}"`
+                );
+              }
+
+              if (!normalizedPattern.test(addrLower)) {
+                throw new Error(
+                  `Pin address is not normalized as "бл. <n>, ж.к. <name>": "${pin.address}"`
+                );
+              }
+            }
+
+            return true;
+          }
