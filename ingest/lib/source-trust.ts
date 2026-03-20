@@ -33,6 +33,7 @@ const SOURCE_TRUST: Record<string, SourceTrustEntry> = {
   "raioniskar-bg": { trust: 0.8, geometryQuality: 2 },
   "rayon-ilinden-bg": { trust: 0.8, geometryQuality: 2 },
   "rayon-pancharevo-bg": { trust: 0.8, geometryQuality: 2 },
+  "triaditsa-org": { trust: 0.8, geometryQuality: 2 },
 };
 
 const DEFAULT_TRUST: SourceTrustEntry = { trust: 0.5, geometryQuality: 0 };

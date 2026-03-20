@@ -27,6 +27,7 @@ The source message listing feature provides dedicated pages for each data source
 - `raioniskar-bg` - Столична община, Район "Искър"
 - `rayon-pancharevo-bg` - Столична община, Район "Панчарево"
 - `rayon-ilinden-bg` - Столична община, Район "Илинден"
+- `triaditsa-org` - Столична община, Район "Триадица"
 - `nimh-severe-weather` - НИМХ (Метеорологични предупреждения)
 
 ## Page Structure
