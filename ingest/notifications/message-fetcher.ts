@@ -1,7 +1,20 @@
 import type { OboDb } from "@oboapp/db";
 import type { Category } from "@oboapp/shared";
+import { CATEGORIES } from "@oboapp/shared";
 import { Message } from "@/lib/types";
 import { logger } from "@/lib/logger";
+import {
+  getString,
+  getOptionalString,
+  getOptionalBoolean,
+  isFeatureCollection,
+} from "@/lib/record-fields";
+
+const categorySet: ReadonlySet<string> = new Set(CATEGORIES);
+
+function isCategory(v: unknown): v is Category {
+  return typeof v === "string" && categorySet.has(v);
+}
 
 function toISOString(value: unknown): string {
   if (value instanceof Date) return value.toISOString();
@@ -24,15 +37,15 @@ export async function getUnprocessedMessages(db: OboDb): Promise<Message[]> {
   for (const data of docs) {
     if (data.notificationsSent !== true) {
       unprocessedMessages.push({
-        id: data._id as string,
-        text: (data.text as string) || "",
-        locality: data.locality as string,
-        geoJson: data.geoJson as Message["geoJson"],
+        id: getString(data._id),
+        text: getString(data.text),
+        locality: getString(data.locality),
+        geoJson: isFeatureCollection(data.geoJson) ? data.geoJson : undefined,
         createdAt: toISOString(data.createdAt),
-        cityWide: data.cityWide as boolean | undefined,
-        source: data.source as string | undefined,
+        cityWide: getOptionalBoolean(data.cityWide),
+        source: getOptionalString(data.source),
         categories: Array.isArray(data.categories)
-          ? (data.categories as Category[])
+          ? data.categories.filter(isCategory)
           : undefined,
       });
     }

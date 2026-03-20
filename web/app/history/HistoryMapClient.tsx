@@ -5,6 +5,14 @@ import { colors } from "@/lib/colors";
 
 type HeatmapPoint = [number, number];
 
+// Augment leaflet module with the heatLayer function from leaflet.heat plugin
+declare module "leaflet" {
+  export function heatLayer(
+    points: HeatmapPoint[],
+    options: Record<string, unknown>,
+  ): import("leaflet").Layer;
+}
+
 interface HeatmapResponse {
   points: HeatmapPoint[];
   messageCount: number;
@@ -49,7 +57,8 @@ async function fetchHeatmapData(
   if (!response.ok) {
     throw new Error("Failed to fetch heatmap data");
   }
-  return response.json() as Promise<HeatmapResponse>;
+  const data: HeatmapResponse = await response.json();
+  return data;
 }
 
 export default function HistoryMapClient({
@@ -60,9 +69,7 @@ export default function HistoryMapClient({
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<import("leaflet").Map | null>(null);
   const heatLayerRef = useRef<import("leaflet").Layer | null>(null);
-  // Store L (leaflet namespace) — cast via unknown because @types/leaflet uses
-  // `export =` and doesn't expose a `.default` member, but at runtime
-  // `(await import("leaflet")).default` is the same object.
+  // Store L (leaflet namespace) for use across effects.
   const leafletRef = useRef<typeof import("leaflet") | null>(null);
   const [isMapReady, setIsMapReady] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -82,7 +89,12 @@ export default function HistoryMapClient({
 
     async function initMap() {
       try {
-        const L = (await import("leaflet")).default as typeof import("leaflet");
+        // @types/leaflet uses `export =`, so the dynamic import gives us a
+        // module with a `.default` property at runtime (via the bundler).
+        // Access it through the module object to stay type-safe.
+        const leafletModule = await import("leaflet");
+        const L: typeof import("leaflet") =
+          "default" in leafletModule ? leafletModule.default : leafletModule;
         await import("leaflet.heat");
 
         if (cancelled || !mapRef.current || mapInstanceRef.current) return;
@@ -164,14 +176,7 @@ export default function HistoryMapClient({
           leafletRef.current
         ) {
           const L = leafletRef.current;
-          const layer = (
-            L as unknown as {
-              heatLayer: (
-                points: HeatmapPoint[],
-                options: Record<string, unknown>,
-              ) => import("leaflet").Layer;
-            }
-          )
+          const layer = L
             .heatLayer(data.points, {
               radius: 20,
               blur: 25,

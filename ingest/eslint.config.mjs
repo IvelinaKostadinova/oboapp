@@ -31,18 +31,26 @@ const eslintConfig = [
 
       // Prefer early returns over else-if-return chains
       "no-else-return": ["error", { allowElseIf: false }],
+
+      // Ban type assertions (as X) - use type guards or proper typing instead
+      "@typescript-eslint/consistent-type-assertions": [
+        "error",
+        { assertionStyle: "never" },
+      ],
     },
   },
-  // Allow 'any' in test files, mocks, and scripts for testing/utility purposes
+  // Allow 'any' and type assertions in test files, mocks, and scripts for testing/utility purposes
   {
     files: [
       "**/*.test.ts",
       "**/__tests__/**",
       "**/__mocks__/**",
       "**/scripts/**",
+      "**/tmp/**",
     ],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/consistent-type-assertions": "off",
     },
   },
   {

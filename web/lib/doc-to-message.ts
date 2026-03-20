@@ -3,6 +3,15 @@ import {
   toOptionalISOString,
   toRequiredISOString,
 } from "@/lib/date-serialization";
+import {
+  getAddresses,
+  getBusStops,
+  getCadastralProperties,
+  getCategories,
+  getFeatureCollection,
+  getPins,
+  getStreets,
+} from "@/lib/typed-arrays";
 
 /**
  * Convert a database record to a public Message object.
@@ -10,29 +19,32 @@ import {
  * so this function only needs to map fields and convert Dates to ISO strings.
  */
 
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
 export function recordToMessage(record: Record<string, unknown>): Message {
   return {
-    id: record._id as string,
-    text: record.text as string,
-    locality: (record.locality as string) ?? "",
-    plainText: record.plainText as string | undefined,
-    addresses: (record.addresses as Message["addresses"]) ?? [],
-    geoJson: record.geoJson as Message["geoJson"],
+    id: typeof record._id === "string" ? record._id : undefined,
+    text: typeof record.text === "string" ? record.text : "",
+    locality: typeof record.locality === "string" ? record.locality : "",
+    plainText: optionalString(record.plainText),
+    addresses: getAddresses(record.addresses),
+    geoJson: getFeatureCollection(record.geoJson),
     crawledAt: toOptionalISOString(record.crawledAt, "crawledAt"),
     createdAt: toRequiredISOString(record.createdAt, "createdAt"),
     finalizedAt: toOptionalISOString(record.finalizedAt, "finalizedAt"),
-    source: record.source as string | undefined,
-    sourceUrl: record.sourceUrl as string | undefined,
-    markdownText: record.markdownText as string | undefined,
-    categories: Array.isArray(record.categories) ? record.categories : [],
+    source: optionalString(record.source),
+    sourceUrl: optionalString(record.sourceUrl),
+    markdownText: optionalString(record.markdownText),
+    categories: getCategories(record.categories),
     timespanStart: toOptionalISOString(record.timespanStart, "timespanStart"),
     timespanEnd: toOptionalISOString(record.timespanEnd, "timespanEnd"),
-    cityWide: (record.cityWide as boolean) || false,
-    responsibleEntity: record.responsibleEntity as string | undefined,
-    pins: record.pins as Message["pins"],
-    streets: record.streets as Message["streets"],
-    cadastralProperties:
-      record.cadastralProperties as Message["cadastralProperties"],
-    busStops: record.busStops as Message["busStops"],
+    cityWide: record.cityWide === true,
+    responsibleEntity: optionalString(record.responsibleEntity),
+    pins: getPins(record.pins),
+    streets: getStreets(record.streets),
+    cadastralProperties: getCadastralProperties(record.cadastralProperties),
+    busStops: getBusStops(record.busStops),
   };
 }

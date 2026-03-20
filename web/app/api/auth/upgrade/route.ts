@@ -60,12 +60,23 @@ async function getUpgradeStats(
 
 function getInterestKey(record: Record<string, unknown>): string {
   const coordinates =
-    (record.coordinates as { lat?: number; lng?: number }) || {};
-  const lat = coordinates.lat ?? "";
-  const lng = coordinates.lng ?? "";
-  const radius = (record.radius as number | undefined) ?? "";
-  const label = (record.label as string | undefined) ?? "";
-  const color = (record.color as string | undefined) ?? "";
+    typeof record.coordinates === "object" &&
+    record.coordinates !== null &&
+    "lat" in record.coordinates &&
+    "lng" in record.coordinates
+      ? record.coordinates
+      : { lat: "", lng: "" };
+  const lat =
+    "lat" in coordinates && typeof coordinates.lat === "number"
+      ? coordinates.lat
+      : "";
+  const lng =
+    "lng" in coordinates && typeof coordinates.lng === "number"
+      ? coordinates.lng
+      : "";
+  const radius = typeof record.radius === "number" ? record.radius : "";
+  const label = typeof record.label === "string" ? record.label : "";
+  const color = typeof record.color === "string" ? record.color : "";
   return `${lat}:${lng}:${radius}:${label}:${color}`;
 }
 
@@ -78,13 +89,26 @@ function getRecordId(record: DbRecord): string | null {
   return typeof id === "string" && id.length > 0 ? id : null;
 }
 
-function buildInterestPayload(record: DbRecord, userId: string): DbRecord {
+function buildInterestPayload(record: DbRecord, userId: string): DbRecord | null {
+  const coords = record.coordinates;
+  if (
+    typeof coords !== "object" ||
+    coords === null ||
+    !("lat" in coords) ||
+    !("lng" in coords) ||
+    typeof coords.lat !== "number" ||
+    typeof coords.lng !== "number"
+  ) {
+    console.warn("Skipping interest with invalid coordinates during upgrade:", record._id);
+    return null;
+  }
+
   return {
     userId,
-    coordinates: record.coordinates,
-    radius: record.radius,
-    label: record.label,
-    color: record.color,
+    coordinates: { lat: coords.lat, lng: coords.lng },
+    radius: typeof record.radius === "number" ? record.radius : 500,
+    label: typeof record.label === "string" ? record.label : undefined,
+    color: typeof record.color === "string" ? record.color : undefined,
     createdAt: record.createdAt instanceof Date ? record.createdAt : new Date(),
     updatedAt: record.updatedAt instanceof Date ? record.updatedAt : new Date(),
   };
@@ -162,10 +186,14 @@ async function restoreUserState(
 
   for (const interestRecord of interestRecords) {
     const id = getRecordId(interestRecord);
+    const payload = buildInterestPayload(interestRecord, userId);
+    if (!payload) {
+      continue;
+    }
     operations.push(
       createSetOperation(
         INTERESTS_COLLECTION,
-        buildInterestPayload(interestRecord, userId),
+        payload,
         id ?? undefined,
       ),
     );
@@ -272,10 +300,10 @@ export async function POST(request: NextRequest) {
     const authHeader = request.headers.get("authorization");
     const { userId: accountUserId } = await verifyAuthToken(authHeader);
 
-    const body = (await request.json()) as {
+    const body: {
       guestUserId?: string;
       option?: UpgradeDecisionOption;
-    };
+    } = await request.json();
 
     const guestUserId = body.guestUserId;
     const option = body.option;
@@ -352,9 +380,13 @@ export async function POST(request: NextRequest) {
         }
 
         for (const guestInterest of guestInterests) {
+          const payload = buildInterestPayload(guestInterest, accountUserId);
+          if (!payload) {
+            continue;
+          }
           operations.push(
             createSetOperation(INTERESTS_COLLECTION, {
-              ...buildInterestPayload(guestInterest, accountUserId),
+              ...payload,
               updatedAt: new Date(),
             }),
           );
@@ -381,7 +413,9 @@ export async function POST(request: NextRequest) {
           accountInterests.map(getInterestKey),
         );
         const accountSubscriptionTokens = new Set(
-          accountSubscriptions.map((doc) => (doc.token as string) ?? ""),
+          accountSubscriptions.map((doc) =>
+            typeof doc.token === "string" ? doc.token : "",
+          ),
         );
 
         for (const guestInterest of guestInterests) {
@@ -390,9 +424,14 @@ export async function POST(request: NextRequest) {
             continue;
           }
 
+          const payload = buildInterestPayload(guestInterest, accountUserId);
+          if (!payload) {
+            continue;
+          }
+
           operations.push(
             createSetOperation(INTERESTS_COLLECTION, {
-              ...buildInterestPayload(guestInterest, accountUserId),
+              ...payload,
               updatedAt: new Date(),
             }),
           );

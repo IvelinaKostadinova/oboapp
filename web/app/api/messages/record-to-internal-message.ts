@@ -1,42 +1,57 @@
-import type { InternalMessage, IngestError } from "@/lib/types";
+import type { InternalMessage } from "@/lib/types";
 import {
   toOptionalISOString,
   toRequiredISOString,
 } from "@/lib/date-serialization";
+import {
+  getAddresses,
+  getBusStops,
+  getCadastralProperties,
+  getCategories,
+  getFeatureCollection,
+  getIngestErrors,
+  getPins,
+  getProcessSteps,
+  getStreets,
+} from "@/lib/typed-arrays";
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function optionalBoolean(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined;
+}
 
 export function recordToInternalMessage(
   record: Record<string, unknown>,
 ): InternalMessage {
   return {
-    id: record._id as string,
-    text: record.text as string,
-    locality: (record.locality as string) ?? "",
-    plainText: record.plainText as string | undefined,
-    markdownText: record.markdownText as string | undefined,
-    addresses: (record.addresses as InternalMessage["addresses"]) ?? [],
-    geoJson: record.geoJson as InternalMessage["geoJson"],
+    id: typeof record._id === "string" ? record._id : undefined,
+    text: typeof record.text === "string" ? record.text : "",
+    locality: typeof record.locality === "string" ? record.locality : "",
+    plainText: optionalString(record.plainText),
+    markdownText: optionalString(record.markdownText),
+    addresses: getAddresses(record.addresses),
+    geoJson: getFeatureCollection(record.geoJson),
     crawledAt: toOptionalISOString(record.crawledAt, "crawledAt"),
     createdAt: toRequiredISOString(record.createdAt, "createdAt"),
     finalizedAt: toOptionalISOString(record.finalizedAt, "finalizedAt"),
-    source: record.source as string | undefined,
-    sourceUrl: record.sourceUrl as string | undefined,
-    categories: Array.isArray(record.categories) ? record.categories : [],
+    source: optionalString(record.source),
+    sourceUrl: optionalString(record.sourceUrl),
+    categories: getCategories(record.categories),
     timespanStart: toOptionalISOString(record.timespanStart, "timespanStart"),
     timespanEnd: toOptionalISOString(record.timespanEnd, "timespanEnd"),
-    cityWide: (record.cityWide as boolean) || false,
-    responsibleEntity: record.responsibleEntity as string | undefined,
-    pins: Array.isArray(record.pins) ? record.pins : undefined,
-    streets: Array.isArray(record.streets) ? record.streets : undefined,
-    cadastralProperties: Array.isArray(record.cadastralProperties)
-      ? record.cadastralProperties
-      : undefined,
-    busStops: Array.isArray(record.busStops) ? record.busStops : undefined,
+    cityWide: record.cityWide === true,
+    responsibleEntity: optionalString(record.responsibleEntity),
+    pins: getPins(record.pins),
+    streets: getStreets(record.streets),
+    cadastralProperties: getCadastralProperties(record.cadastralProperties),
+    busStops: getBusStops(record.busStops),
     // Internal-only fields
-    process: Array.isArray(record.process) ? record.process : undefined,
-    ingestErrors: Array.isArray(record.ingestErrors)
-      ? (record.ingestErrors as IngestError[])
-      : undefined,
-    isRelevant: record.isRelevant as boolean | undefined,
-    isUnreadable: record.isUnreadable as boolean | undefined,
+    process: getProcessSteps(record.process),
+    ingestErrors: getIngestErrors(record.ingestErrors),
+    isRelevant: optionalBoolean(record.isRelevant),
+    isUnreadable: optionalBoolean(record.isUnreadable),
   };
 }

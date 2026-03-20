@@ -48,9 +48,9 @@ export async function GET(request: Request) {
         return value.trim().length === 0;
       }
       // Check for empty FeatureCollection (object with no features)
-      if (typeof value === "object") {
-        const fc = value as Record<string, unknown>;
-        const features = fc.features;
+      if (typeof value === "object" && value !== null) {
+        const fc = value;
+        const features = "features" in fc ? fc.features : undefined;
         if (!Array.isArray(features) || features.length === 0) return true;
       }
       return false;

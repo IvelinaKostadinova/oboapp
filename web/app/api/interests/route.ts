@@ -22,13 +22,23 @@ function applyCoordinatesUpdate(
   updates: Record<string, unknown>,
   coordinates: unknown,
 ): NextResponse | null {
-  if (!coordinates) {
+  // No coordinates provided — not an error, just no update
+  if (coordinates === undefined) {
     return null;
   }
 
-  const coords = coordinates as { lat?: unknown; lng?: unknown };
+  if (
+    typeof coordinates !== "object" ||
+    coordinates === null ||
+    !("lat" in coordinates) ||
+    !("lng" in coordinates)
+  ) {
+    return NextResponse.json({ error: "Invalid coordinates: must be an object with lat and lng" }, { status: 400 });
+  }
+
+  const coords = coordinates;
   if (typeof coords.lat !== "number" || typeof coords.lng !== "number") {
-    return NextResponse.json({ error: "Invalid coordinates" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid coordinates: lat and lng must be numbers" }, { status: 400 });
   }
 
   updates.coordinates = {
@@ -46,7 +56,7 @@ function applyRadiusUpdate(
     return;
   }
 
-  updates.radius = validateRadius(radius as number);
+  updates.radius = validateRadius(typeof radius === "number" ? radius : DEFAULT_RADIUS);
 }
 
 function applyMetadataUpdates(
@@ -68,14 +78,37 @@ function applyMetadataUpdates(
   }
 }
 
-function recordToInterest(record: Record<string, unknown>): Interest {
+function recordToInterest(record: Record<string, unknown>): Interest | null {
+  const coords =
+    typeof record.coordinates === "object" &&
+    record.coordinates !== null &&
+    "lat" in record.coordinates &&
+    "lng" in record.coordinates
+      ? record.coordinates
+      : null;
+
+  if (
+    !coords ||
+    typeof coords.lat !== "number" ||
+    typeof coords.lng !== "number"
+  ) {
+    console.warn(
+      "[recordToInterest] Skipping interest with missing/invalid coordinates:",
+      { interestId: record._id, userId: record.userId },
+    );
+    return null;
+  }
+
   return {
-    id: record._id as string,
-    userId: record.userId as string,
-    coordinates: record.coordinates as Interest["coordinates"],
-    radius: record.radius as number,
-    label: record.label as string | undefined,
-    color: record.color as string | undefined,
+    id: typeof record._id === "string" ? record._id : undefined,
+    userId: typeof record.userId === "string" ? record.userId : "",
+    coordinates: {
+      lat: coords.lat,
+      lng: coords.lng,
+    },
+    radius: typeof record.radius === "number" ? record.radius : DEFAULT_RADIUS,
+    label: typeof record.label === "string" ? record.label : undefined,
+    color: typeof record.color === "string" ? record.color : undefined,
     createdAt: toRequiredISOString(record.createdAt, "createdAt"),
     updatedAt: toRequiredISOString(record.updatedAt, "updatedAt"),
   };
@@ -348,7 +381,13 @@ export async function PATCH(request: NextRequest) {
     // Fetch updated document
     const updatedDoc = await db.interests.findById(id);
 
-    const updatedInterest: Interest = recordToInterest(updatedDoc!);
+    const updatedInterest = updatedDoc ? recordToInterest(updatedDoc) : null;
+    if (!updatedInterest) {
+      return NextResponse.json(
+        { error: "Failed to read updated interest" },
+        { status: 500 },
+      );
+    }
 
     return NextResponse.json({ interest: updatedInterest });
   } catch (error) {

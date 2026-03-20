@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
-import { NotificationHistoryItem, DeviceNotification } from "@/lib/types";
+import { NotificationHistoryItem } from "@/lib/types";
 import { verifyAuthToken } from "@/lib/verifyAuthToken";
 import {
   toOptionalISOString,
@@ -34,33 +34,53 @@ export async function GET(request: NextRequest) {
     const hasMore = docs.length > limit;
     const itemsToReturn = hasMore ? docs.slice(0, limit) : docs;
 
-    const historyItems: NotificationHistoryItem[] = itemsToReturn.map((doc) => {
+    const historyItems: NotificationHistoryItem[] = itemsToReturn
+      .filter((doc) => {
+        const hasId = typeof doc._id === "string" && doc._id !== "";
+        const hasMessageId = typeof doc.messageId === "string" && doc.messageId !== "";
+        const hasInterestId = typeof doc.interestId === "string" && doc.interestId !== "";
+        return hasId && hasMessageId && hasInterestId;
+      })
+      .map((doc) => {
       const notifiedAt = toRequiredISOString(doc.notifiedAt, "notifiedAt");
-      const messageSnapshot =
-        (doc.messageSnapshot as NotificationHistoryItem["messageSnapshot"]) ||
-        undefined;
+      const rawSnapshot = doc.messageSnapshot;
+      const snapshotText =
+        typeof rawSnapshot === "object" &&
+        rawSnapshot !== null &&
+        "text" in rawSnapshot &&
+        typeof rawSnapshot.text === "string"
+          ? rawSnapshot.text
+          : "";
+      const snapshotCreatedAt =
+        typeof rawSnapshot === "object" &&
+        rawSnapshot !== null &&
+        "createdAt" in rawSnapshot
+          ? rawSnapshot.createdAt
+          : undefined;
 
-      // Calculate successful devices count
-      const deviceNotifications =
-        (doc.deviceNotifications as DeviceNotification[]) || [];
-      const successfulDevicesCount = deviceNotifications.filter(
-        (d: DeviceNotification) => d.success,
+      // Calculate successful devices count from raw DB array
+      const rawDeviceNotifications = Array.isArray(doc.deviceNotifications)
+        ? doc.deviceNotifications
+        : [];
+      const successfulDevicesCount = rawDeviceNotifications.filter(
+        (d: unknown) =>
+          typeof d === "object" && d !== null && "success" in d && d.success === true,
       ).length;
 
       return {
-        id: doc._id as string,
-        messageId: doc.messageId as string,
+        id: typeof doc._id === "string" ? doc._id : "",
+        messageId: typeof doc.messageId === "string" ? doc.messageId : "",
         messageSnapshot: {
-          text: messageSnapshot?.text ?? "",
+          text: snapshotText,
           createdAt:
             toOptionalISOString(
-              messageSnapshot?.createdAt,
+              snapshotCreatedAt,
               "messageSnapshot.createdAt",
             ) ?? notifiedAt,
         },
         notifiedAt,
-        distance: doc.distance as number,
-        interestId: doc.interestId as string,
+        distance: typeof doc.distance === "number" ? doc.distance : 0,
+        interestId: typeof doc.interestId === "string" ? doc.interestId : "",
         successfulDevicesCount,
         readAt: toOptionalISOString(doc.readAt, "readAt"),
       };

@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     const { userId } = await verifyAuthToken(authHeader);
 
     const body = await request.json();
-    const { token, endpoint, deviceInfo } = body;
+    const { token, endpoint, deviceInfo: rawDeviceInfo } = body;
 
     if (!token || !endpoint) {
       return NextResponse.json(
@@ -39,6 +39,11 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
+
+    const deviceInfo =
+      typeof rawDeviceInfo === "object" && rawDeviceInfo !== null && !Array.isArray(rawDeviceInfo)
+        ? rawDeviceInfo
+        : {};
 
     const db = await getDb();
     const now = new Date();
@@ -51,7 +56,13 @@ export async function POST(request: NextRequest) {
 
     if (existing) {
       // Update existing subscription
-      const docId = existing._id as string;
+      const docId = typeof existing._id === "string" ? existing._id : "";
+      if (!docId) {
+        return NextResponse.json(
+          { error: "Existing subscription has no valid ID" },
+          { status: 500 },
+        );
+      }
       await db.notificationSubscriptions.updateOne(docId, {
         endpoint,
         deviceInfo: deviceInfo || {},
@@ -67,12 +78,16 @@ export async function POST(request: NextRequest) {
 
       const subscription: NotificationSubscription = {
         id: docId,
-        userId: updatedDoc.userId as string,
-        token: updatedDoc.token as string,
-        endpoint: updatedDoc.endpoint as string,
+        userId: typeof updatedDoc.userId === "string" ? updatedDoc.userId : "",
+        token: typeof updatedDoc.token === "string" ? updatedDoc.token : "",
+        endpoint: typeof updatedDoc.endpoint === "string" ? updatedDoc.endpoint : "",
         createdAt: toRequiredISOString(updatedDoc.createdAt, "createdAt"),
         updatedAt: toRequiredISOString(updatedDoc.updatedAt, "updatedAt"),
-        deviceInfo: (updatedDoc.deviceInfo as Record<string, unknown>) || {},
+        deviceInfo:
+          typeof updatedDoc.deviceInfo === "object" &&
+          updatedDoc.deviceInfo !== null
+            ? updatedDoc.deviceInfo
+            : {},
       };
 
       return NextResponse.json(subscription);
@@ -139,7 +154,14 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Delete the subscription
-    await db.notificationSubscriptions.deleteOne(existing._id as string);
+    const existingId = typeof existing._id === "string" ? existing._id : "";
+    if (!existingId) {
+      return NextResponse.json(
+        { error: "Subscription record has no valid ID" },
+        { status: 500 },
+      );
+    }
+    await db.notificationSubscriptions.deleteOne(existingId);
 
     return NextResponse.json({ success: true });
   } catch (error) {
