@@ -268,7 +268,7 @@ main:
                           - log15:
                               call: sys.log
                               args:
-                                text: '${"Crawler triaditsa failed: " + string(e)}'
+                                text: '${"Crawler triaditsa-org failed: " + string(e)}'
                                 severity: "ERROR"
     - ingest:
         try:
