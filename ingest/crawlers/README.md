@@ -30,7 +30,7 @@ Each crawler:
 
 ## Screenshot Baselines (Required)
 
-Every crawler directory must include baseline screenshots for easier maintenance when source site design changes.
+Every crawler directory should include baseline screenshots for easier maintenance when source site design changes.
 
 - Preferred files: `_entry.png` (listing/index page) and `_message.png` (detail page)
 - Place screenshots directly in `ingest/crawlers/{source-name}/`
