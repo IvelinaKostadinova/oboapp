@@ -88,5 +88,11 @@
     "url": "https://triaditza.org/%D0%BD%D0%BE%D0%B2%D0%B8%D0%BD%D0%B8/",
     "name": "Столична община, Район \"Триадица\"",
     "localities": ["bg.sofia"]
+  },
+  {
+    "id": "krasna-polyana-org",
+    "url": "https://krasnapolyana.bg/home/latest-news",
+    "name": "Столична община, Район \"Красна поляна\"",
+    "localities": ["bg.sofia"]
   }
 ]
