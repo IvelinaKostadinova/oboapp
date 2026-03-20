@@ -305,6 +305,12 @@ locals {
       timeout      = "1800s"
       description  = "Crawl Krasna Polyana district website"
     }
+    vrabnitsa = {
+      source       = "vrabnitsa-org"
+      memory       = "1Gi"
+      timeout      = "1800s"
+      description  = "Crawl Vrabnitsa district website"
+    }
     nimh-severe-weather = {
       source       = "nimh-severe-weather"
       memory       = "512Mi"

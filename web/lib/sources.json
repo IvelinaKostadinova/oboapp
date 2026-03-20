@@ -94,5 +94,11 @@
     "url": "https://krasnapolyana.bg/home/latest-news",
     "name": "Столична община, Район \"Красна поляна\"",
     "localities": ["bg.sofia"]
+  },
+  {
+    "id": "vrabnitsa-org",
+    "url": "https://vrabnitsa.sofia.bg/aktualno/news",
+    "name": "Столична община, Район \"Връбница\"",
+    "localities": ["bg.sofia"]
   }
 ]

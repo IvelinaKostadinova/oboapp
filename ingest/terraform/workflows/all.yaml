@@ -287,6 +287,23 @@ main:
                               args:
                                 text: '${"Crawler krasna-polyana failed: " + string(e)}'
                                 severity: "ERROR"
+            - vrabnitsa:
+                steps:
+                  - callVrabnitsa:
+                      try:
+                        call: http.post
+                        args:
+                          url: '${"https://" + region + "-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/" + project + "/jobs/crawl-vrabnitsa:run"}'
+                          auth:
+                            type: OAuth2
+                      except:
+                        as: e
+                        steps:
+                          - log16:
+                              call: sys.log
+                              args:
+                                text: '${"Crawler vrabnitsa-org failed: " + string(e)}'
+                                severity: "ERROR"
     - ingest:
         try:
           call: http.post
