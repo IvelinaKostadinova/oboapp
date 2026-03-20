@@ -37,7 +37,7 @@ Google Cloud Workflows
    - **Use case**: Short-lived disruptions requiring frequent updates (power outages, heating issues, water disruptions)
 
 2. **All Workflow** (`pipeline-all`)
-  - **Crawlers**: 16 sources (all currently deployed crawlers)
+  - **Crawlers**: All currently deployed crawlers
    - **Schedule**: 3 times daily at 10:00 AM, 2:00 PM, 4:00 PM (Europe/Sofia timezone)
    - **Use case**: Long-term construction/repair projects from district municipalities
 
