@@ -1,5 +1,5 @@
 # Cloud Workflow for All Crawlers Pipeline
-# Runs all 16 crawlers in two parallel batches (10 + 5 due to GCP 10-branch limit),
+# Runs all crawlers in multiple parallel batches (GCP 10-branch limit),
 # then runs ingest and notify sequentially.
 # Always continues to ingest/notify even if some crawlers fail.
 
