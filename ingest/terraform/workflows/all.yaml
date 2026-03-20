@@ -282,7 +282,7 @@ main:
                       except:
                         as: e
                         steps:
-                          - log15:
+                          - log16:
                               call: sys.log
                               args:
                                 text: '${"Crawler krasna-polyana failed: " + string(e)}'
@@ -312,7 +312,7 @@ main:
         except:
           as: e
           steps:
-            - log17:
+            - log18:
                 call: sys.log
                 args:
                   text: '${"Notify failed: " + string(e)}'
