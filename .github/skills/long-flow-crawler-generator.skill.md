@@ -61,6 +61,10 @@ Ask the user for the following information:
    - Reference the pattern from any existing fetch scripts in `tmp/` directory
 5. **Logo readiness**: Is the 200x200px PNG logo ready for `web/public/sources/{{source-name}}.png`?
 6. **Site structure confirmation**: Does the site use WordPress-style architecture (blog index with post links)?
+7. **Screenshot artifacts**: Confirm screenshot capture plan for crawler baselines:
+   - One listing/entry screenshot (`_entry.png` preferred)
+   - One message/detail screenshot (`_message.png` preferred)
+   - Stored in `ingest/crawlers/{{source-name}}/`
 
 ## Phase 3: Implementation
 
@@ -92,6 +96,17 @@ Create these 5 files in `ingest/crawlers/{{source-name}}/`:
 5. **`tsconfig.json`** - TypeScript config
    - Copy pattern from `ingest/crawlers/rayon-oborishte-bg/tsconfig.json`
 
+### Required Visual Baseline Artifacts
+
+Add screenshot companions in `ingest/crawlers/{{source-name}}/`:
+
+- `_entry.png` - full-page screenshot of the listing/index page used for extraction
+- `_message.png` - full-page screenshot of a representative message/detail page
+
+Notes:
+- Preferred naming is `_entry.png` and `_message.png`; source-specific names are acceptable when page types differ.
+- If screenshots cannot be captured in the current environment, add a TODO item in your final report and block completion until artifacts are provided.
+
 ### Unit Tests
 
 Create `extractors.test.ts`:
@@ -117,6 +132,7 @@ Before finalizing, verify:
 - ✅ Crawler handles errors per-post (logs and continues, doesn't fail entire crawl)
 - ✅ Uses named exports (not default exports)
 - ✅ No barrel files (`index.ts` for re-exports)
+- ✅ Baseline screenshots are present in crawler directory (`_entry.png` + `_message.png` or equivalent)
 
 ### Testing Against Test Database
 

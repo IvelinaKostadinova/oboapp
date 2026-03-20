@@ -28,6 +28,37 @@ Each crawler:
 3. Stores documents in Firestore with `sourceType` identifier
 4. Tracks processed URLs to avoid duplicates
 
+## Screenshot Baselines (Required)
+
+Every crawler directory must include baseline screenshots for easier maintenance when source site design changes.
+
+- Preferred files: `_entry.png` (listing/index page) and `_message.png` (detail page)
+- Place screenshots directly in `ingest/crawlers/{source-name}/`
+- Source-specific names are allowed when structure differs
+- Refresh screenshots whenever selectors/parsers are updated after site redesign
+
+Tip: full-page capture tools such as GoFullPage can speed up baseline creation.
+
+Bulk refresh script (repo-maintained): `ingest/scripts/capture-crawler-baselines.ts`
+
+### Retrofit Checklist (Existing Crawlers)
+
+- ✅ `erm-zapad` (has `_entry.png`, `_message.png`)
+- ✅ `lozenets-sofia-bg` (has `_entry.png`, `_message.png`)
+- ✅ `mladost-bg` (has `_entry.png`, `_message.png`)
+- ✅ `nimh-severe-weather` (has `_entry.png`, `_message.png`)
+- ✅ `raioniskar-bg` (has `_entry.png`, `_message.png`)
+- ✅ `rayon-ilinden-bg` (has `_entry.png`, `_message.png`)
+- ✅ `rayon-oborishte-bg` (has `_entry.png`, `_message.png`)
+- ✅ `rayon-pancharevo-bg` (has `_entry.png`, `_message.png`)
+- ✅ `so-slatina-org` (has `_entry.png`, `_message.png`)
+- ✅ `sofia-bg` (has `_entry.png`, `_message.png`)
+- ✅ `sofiyska-voda` (has `_entry.png`, `_message.png`)
+- ✅ `sredec-sofia-org` (has `_entry.png`, `_message.png`)
+- ✅ `studentski-bg` (has `_entry.png`, `_message.png`)
+- ✅ `toplo-bg` (has `_entry.png`, `_message.png`)
+- ✅ `triaditsa-org` (has `_entry.png`, `_message.png`)
+
 ### Crawler Architecture
 
 WordPress-style crawlers (rayon-oborishte-bg, sredec-sofia-org, sofia-bg, mladost-bg, studentski-bg, so-slatina-org, lozenets-sofia-bg, raioniskar-bg, rayon-pancharevo-bg, rayon-ilinden-bg) use shared utilities from `shared/webpage-crawlers.ts`:
