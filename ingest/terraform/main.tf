@@ -200,7 +200,7 @@ resource "google_workflows_workflow" "pipeline_emergent" {
 resource "google_workflows_workflow" "pipeline_all" {
   name            = "pipeline-all"
   region          = var.region
-  description     = "Orchestrates all 16 crawlers in parallel, then ingest and notify"
+  description     = "Orchestrates all crawlers in parallel, then ingest and notify"
   service_account = google_service_account.ingest_runner.email
   source_contents = file("${path.module}/workflows/all.yaml")
   
