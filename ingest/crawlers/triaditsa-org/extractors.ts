@@ -4,6 +4,17 @@ import { SELECTORS } from "./selectors";
 import { extractPostLinks as extractPostLinksShared } from "../shared/extractors";
 
 function extractDateFromStructuredDataNode(node: unknown): string | undefined {
+  if (Array.isArray(node)) {
+    for (const entry of node) {
+      const found = extractDateFromStructuredDataNode(entry);
+      if (found) {
+        return found;
+      }
+    }
+
+    return undefined;
+  }
+
   if (!node || typeof node !== "object") {
     return undefined;
   }

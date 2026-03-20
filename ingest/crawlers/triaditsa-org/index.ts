@@ -21,11 +21,11 @@ const SOURCE_TYPE = "triaditsa-org";
 const LOCALITY = "bg.sofia";
 const DELAY_BETWEEN_REQUESTS = 2000;
 
-function parseTriaditsaDate(dateText: string): string {
+export function parseTriaditsaDate(dateText: string): string {
   const normalized = dateText.trim();
 
   if (!normalized) {
-    return parseBulgarianDate(normalized);
+    throw new Error("Missing date text for triaditsa-org post");
   }
 
   const isoTimestamp = Date.parse(normalized);

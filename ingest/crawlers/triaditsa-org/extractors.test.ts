@@ -34,6 +34,23 @@ describe("triaditsa-org/extractors", () => {
       expect(result).toBe("2026-03-12T10:31:30+00:00");
     });
 
+    it("extracts datePublished from top-level JSON-LD arrays", () => {
+      const scripts = [
+        JSON.stringify([
+          {
+            "@type": "BreadcrumbList",
+          },
+          {
+            "@type": "NewsArticle",
+            datePublished: "2026-03-13T09:15:00+00:00",
+          },
+        ]),
+      ];
+
+      const result = extractDateFromJsonLdScripts(scripts);
+      expect(result).toBe("2026-03-13T09:15:00+00:00");
+    });
+
     it("returns undefined for invalid JSON-LD content", () => {
       const result = extractDateFromJsonLdScripts(["not-json"]);
       expect(result).toBeUndefined();
