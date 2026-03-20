@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseTriaditsaDate } from "./index";
+import { parseTriaditsaDate, resolveTriaditsaDateText } from "./index";
 
 describe("triaditsa-org/index date parser", () => {
   it("parses ISO date strings directly", () => {
@@ -17,9 +17,21 @@ describe("triaditsa-org/index date parser", () => {
     expect(parsed.getUTCDate()).toBe(17);
   });
 
-  it("throws when date text is empty", () => {
-    expect(() => parseTriaditsaDate("   ")).toThrow(
-      "Missing date text for triaditsa-org post",
+  it("falls back to current timestamp when date text is empty", () => {
+    const iso = parseTriaditsaDate("   ");
+    expect(Number.isNaN(Date.parse(iso))).toBe(false);
+  });
+
+  it("falls back to listing date when extracted date is empty", () => {
+    const resolved = resolveTriaditsaDateText("   ", "17.03.2026");
+    expect(resolved).toBe("17.03.2026");
+  });
+
+  it("prefers extracted date over listing date", () => {
+    const resolved = resolveTriaditsaDateText(
+      "2026-03-12T10:31:30+00:00",
+      "17.03.2026",
     );
+    expect(resolved).toBe("2026-03-12T10:31:30+00:00");
   });
 });

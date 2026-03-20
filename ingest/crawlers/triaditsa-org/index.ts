@@ -21,11 +21,37 @@ const SOURCE_TYPE = "triaditsa-org";
 const LOCALITY = "bg.sofia";
 const DELAY_BETWEEN_REQUESTS = 2000;
 
+export function resolveTriaditsaDateText(
+  extractedDateText: string,
+  listingDateText: string,
+): string {
+  const normalizedExtracted = extractedDateText.trim();
+  if (normalizedExtracted) {
+    return normalizedExtracted;
+  }
+
+  const normalizedListing = listingDateText.trim();
+  if (normalizedListing) {
+    logger.warn(
+      "Missing extracted post date for triaditsa-org post, falling back to listing date",
+    );
+    return normalizedListing;
+  }
+
+  logger.warn(
+    "Missing extracted and listing date for triaditsa-org post, falling back to current timestamp",
+  );
+  return "";
+}
+
 export function parseTriaditsaDate(dateText: string): string {
   const normalized = dateText.trim();
 
   if (!normalized) {
-    throw new Error("Missing date text for triaditsa-org post");
+    logger.warn(
+      "Missing date text for triaditsa-org post, falling back to current timestamp",
+    );
+    return new Date().toISOString();
   }
 
   const isoTimestamp = Date.parse(normalized);
@@ -44,7 +70,13 @@ const processPost = (browser: Browser, postLink: PostLink, db: OboDb) =>
     SOURCE_TYPE,
     LOCALITY,
     DELAY_BETWEEN_REQUESTS,
-    extractPostDetails,
+    async (page) => {
+      const details = await extractPostDetails(page);
+      return {
+        ...details,
+        dateText: resolveTriaditsaDateText(details.dateText, postLink.date),
+      };
+    },
     parseTriaditsaDate,
   );
 
