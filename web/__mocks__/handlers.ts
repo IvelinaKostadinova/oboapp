@@ -5,6 +5,7 @@ import { MOCK_INTERESTS, MOCK_USER_ID } from "./fixtures/interests";
 import { MOCK_SUBSCRIPTIONS } from "./fixtures/subscriptions";
 import { MOCK_NOTIFICATION_HISTORY } from "./fixtures/notification-history";
 import { MOCK_API_CLIENT } from "./fixtures/api-client";
+import { MOCK_EVENTS, MOCK_EVENT_MESSAGES } from "./fixtures/events";
 import { getCentroid } from "@/lib/geometry-utils";
 import type {
   Interest,
@@ -556,5 +557,52 @@ export const handlers = [
       messages: MOCK_UNREADABLE_MESSAGES,
       nextCursor: undefined,
     });
+  }),
+
+  // GET /api/events - Return paginated events sorted by updatedAt desc
+  http.get("/api/events", ({ request }) => {
+    const url = new URL(request.url);
+    const cursorUpdatedAt = url.searchParams.get("cursorUpdatedAt");
+    const cursorId = url.searchParams.get("cursorId");
+
+    let events = [...MOCK_EVENTS].sort(
+      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+    );
+
+    if (cursorUpdatedAt && cursorId) {
+      const cursorTime = new Date(cursorUpdatedAt).getTime();
+      events = events.filter((evt) => {
+        const evtTime = new Date(evt.updatedAt).getTime();
+        if (evtTime < cursorTime) return true;
+        if (evtTime > cursorTime) return false;
+        return (evt.id ?? "").localeCompare(cursorId) < 0;
+      });
+    }
+
+    return HttpResponse.json({
+      events,
+      nextCursor: undefined,
+    });
+  }),
+
+  // GET /api/events/messages - Return messages linked to a specific event
+  http.get("/api/events/messages", ({ request }) => {
+    const url = new URL(request.url);
+    const eventId = url.searchParams.get("eventId");
+
+    if (!eventId) {
+      return HttpResponse.json(
+        { error: "eventId query parameter is required" },
+        { status: 400 },
+      );
+    }
+
+    const eventMessages = MOCK_EVENT_MESSAGES.filter(
+      (em) => em.eventId === eventId,
+    );
+    const messageIds = new Set(eventMessages.map((em) => em.messageId));
+    const messages = MOCK_MESSAGES.filter((m) => messageIds.has(m.id ?? ""));
+
+    return HttpResponse.json({ messages, eventMessages });
   }),
 ];

@@ -78,6 +78,20 @@ npx tsx migrate/2026-03-15-create-events-from-messages.ts
 
 The migration is idempotent — running it again skips already-linked messages.
 
+## Web Observability Page
+
+The `/events` page provides a read-only view of all events for observability before events replace messages on the map.
+
+- **Single-message events** (1:1) render as flat cards
+- **Multi-message events** render as collapsed accordions — expanding shows linked messages with their confidence scores and source names
+- Pagination loads older events on demand
+- Accessible via the footer link "Групирани съобщения"
+
+API endpoints:
+
+- `GET /api/events` — paginated event list (cursor-based, sorted by `updatedAt` desc, filtered by locality)
+- `GET /api/events/messages?eventId=X` — messages linked to a specific event with `EventMessage` match metadata
+
 ## Related
 
 - [database-layer.md](database-layer.md) — DB access patterns for `events` and `eventMessages` collections, and the linking model (`eventMessages` as authoritative source of truth vs `messages.eventId` as denormalized cache)

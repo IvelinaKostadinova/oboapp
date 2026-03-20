@@ -398,7 +398,7 @@ The UI is in Bulgarian. All Bulgarian text must use consistent register:
 
 **Architecture**:
 
-- **Fixtures**: Static mock data in `web/__mocks__/fixtures/` (~20 messages, 2 interests, 5 notifications)
+- **Fixtures**: Static mock data in `web/__mocks__/fixtures/` (~20 messages, 7 events, 2 interests, 5 notifications)
 - **Handlers**: MSW request handlers in `web/__mocks__/handlers.ts` intercept all `/api/*` routes
 - **Browser worker**: `web/__mocks__/browser.ts` sets up service worker in development mode
 - **Auth mock**: `web/__mocks__/firebase-auth.ts` provides pre-authenticated user state
@@ -407,7 +407,7 @@ The UI is in Bulgarian. All Bulgarian text must use consistent register:
 
 **Coverage**:
 
-- ✅ All API routes mocked (messages, interests, subscriptions, notifications)
+- ✅ All API routes mocked (messages, events, interests, subscriptions, notifications)
 - ✅ Firebase Auth returns mock user (bypasses Google OAuth)
 - ✅ In-memory CRUD state for interests/subscriptions
 - ❌ No Firebase Cloud Messaging (push notifications)

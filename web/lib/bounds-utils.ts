@@ -4,16 +4,22 @@
 
 import * as turf from "@turf/turf";
 import type { GeoJSONFeature } from "@/lib/types";
-import { BOUNDS, getBoundsForLocality, getCenterForLocality } from "@oboapp/shared";
+import {
+  BOUNDS,
+  getBoundsForLocality,
+  getCenterForLocality,
+} from "@oboapp/shared";
 
 /**
  * Get locality from environment variable
  * @throws Error if NEXT_PUBLIC_LOCALITY is not set
  */
-function getLocality(): string {
+export function getLocality(): string {
   const locality = process.env.NEXT_PUBLIC_LOCALITY;
   if (!locality) {
-    throw new Error("NEXT_PUBLIC_LOCALITY environment variable is required but not set");
+    throw new Error(
+      "NEXT_PUBLIC_LOCALITY environment variable is required but not set",
+    );
   }
   return locality;
 }

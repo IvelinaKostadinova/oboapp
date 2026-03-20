@@ -4,14 +4,7 @@ import { useState, useCallback } from "react";
 import HistoryMapWrapper from "./HistoryMapWrapper";
 import HistoryFilterModal from "./HistoryFilterModal";
 import type { HeatmapStats } from "./HistoryMapClient";
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("bg-BG", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
+import { formatDate } from "@/lib/date-format";
 
 /**
  * Client component that owns the filter state for the history heatmap page.
@@ -37,10 +30,7 @@ export default function HistoryContent() {
 
   const handleCloseModal = useCallback(() => setIsModalOpen(false), []);
 
-  function handleApplyFilters(
-    categories: Set<string>,
-    sources: Set<string>,
-  ) {
+  function handleApplyFilters(categories: Set<string>, sources: Set<string>) {
     // Shallow-compare to avoid triggering a re-fetch when nothing changed
     setSelectedCategories((prev) => {
       if (

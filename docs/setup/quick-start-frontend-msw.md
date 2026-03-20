@@ -54,6 +54,7 @@ You should see console logs indicating MSW is active:
 ✅ **Fully Functional**:
 
 - Map display with ~20 pre-generated messages
+- Grouped events page (`/events`) with event accordions
 - Category filtering
 - Viewport-based message filtering
 - Interest zone management (create, edit, delete)
@@ -81,6 +82,12 @@ You should see console logs indicating MSW is active:
 - **~20 messages** covering all categories (water, construction, public-transport, etc.)
 - **Mixed locations**: Some clustered around city center, others scattered across Sofia
 - **Edge cases**: City-wide alerts, messages without GeoJSON, long text, uncategorized messages
+
+### Events
+
+- **7 events** grouping messages into real-world incidents
+- **Mix of single-message events** (1:1) and **multi-message events** (2–3 messages each)
+- **Event-message links** with confidence scores and match signals
 
 ### User State
 
