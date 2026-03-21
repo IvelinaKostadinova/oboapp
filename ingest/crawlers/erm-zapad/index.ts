@@ -38,7 +38,7 @@ const LOCALITY = "bg.sofia";
  * Discover active София-град municipalities from the index page
  */
 async function discoverMunicipalities(): Promise<Municipality[]> {
-  logger.info("Discovering София-град municipalities");
+  logger.debug("Discovering София-град municipalities", { sourceType: SOURCE_TYPE });
 
   const browser = await launchBrowser();
   const page = await browser.newPage();
@@ -92,7 +92,8 @@ async function discoverMunicipalities(): Promise<Municipality[]> {
       return results;
     });
 
-    logger.info("Found municipalities", {
+    logger.debug("Found municipalities", {
+      sourceType: SOURCE_TYPE,
       count: municipalities.length,
       municipalities: municipalities.map((m) => `${m.code}: ${m.name}`),
     });
@@ -149,7 +150,7 @@ async function fetchMunicipalityIncidents(
  */
 function buildSourceDocument(pins: PinRecord[]): ErmZapadSourceDocument | null {
   if (pins.length === 0) {
-    logger.warn("Skipping empty pin array");
+    logger.warn("Skipping empty pin array", { sourceType: SOURCE_TYPE });
     return null;
   }
 
@@ -158,14 +159,14 @@ function buildSourceDocument(pins: PinRecord[]): ErmZapadSourceDocument | null {
 
   // Validate required fields
   if (!pin.eventId || typeof pin.eventId !== "string") {
-    logger.warn("Skipping pin without eventId");
+    logger.warn("Skipping pin without eventId", { sourceType: SOURCE_TYPE });
     return null;
   }
 
   // Build GeoJSON with all pins for this incident
   const geoJson = buildGeoJSON(pins);
   if (!geoJson) {
-    logger.warn("Skipping incident without geometry", { eventId: pin.eventId });
+    logger.warn("Skipping incident without geometry", { sourceType: SOURCE_TYPE, eventId: pin.eventId });
     return null;
   }
 
@@ -173,6 +174,7 @@ function buildSourceDocument(pins: PinRecord[]): ErmZapadSourceDocument | null {
   const validation = validateAndFixGeoJSON(geoJson, pin.eventId);
   if (!validation.isValid || !validation.geoJson) {
     logger.warn("Invalid GeoJSON for incident", {
+      sourceType: SOURCE_TYPE,
       eventId: pin.eventId,
       errors: validation.errors,
     });
@@ -182,6 +184,7 @@ function buildSourceDocument(pins: PinRecord[]): ErmZapadSourceDocument | null {
   // Log any coordinate fixes
   if (validation.warnings.length > 0) {
     logger.warn("Fixed GeoJSON for incident", {
+      sourceType: SOURCE_TYPE,
       eventId: pin.eventId,
       warnings: validation.warnings,
     });
@@ -199,6 +202,7 @@ function buildSourceDocument(pins: PinRecord[]): ErmZapadSourceDocument | null {
       datePublished = parseBulgarianDateTime(pin.begin_event).toISOString();
     } catch {
       logger.warn("Invalid date format", {
+        sourceType: SOURCE_TYPE,
         eventId: pin.eventId,
         beginEvent: pin.begin_event,
       });
@@ -231,14 +235,17 @@ function buildSourceDocument(pins: PinRecord[]): ErmZapadSourceDocument | null {
 async function processMunicipality(
   municipality: Municipality,
 ): Promise<PinRecord[]> {
-  logger.info("Processing municipality", {
+  logger.debug("Processing municipality", {
+    sourceType: SOURCE_TYPE,
     name: municipality.name,
     code: municipality.code,
   });
 
   try {
     const incidents = await fetchMunicipalityIncidents(municipality.code);
-    logger.info("Found incidents for municipality", {
+    logger.debug("Found incidents for municipality", {
+      sourceType: SOURCE_TYPE,
+      municipality: municipality.name,
       count: incidents.length,
     });
 
@@ -253,10 +260,11 @@ async function processMunicipality(
       allPins.push(...pins);
     }
 
-    logger.info("Extracted pins", { count: allPins.length });
+    logger.debug("Extracted pins", { sourceType: SOURCE_TYPE, municipality: municipality.name, count: allPins.length });
     return allPins;
   } catch (error) {
     logger.error("Failed to fetch incidents for municipality", {
+      sourceType: SOURCE_TYPE,
       code: municipality.code,
       error: error instanceof Error ? error.message : String(error),
     });
@@ -282,7 +290,8 @@ async function saveIncidents(
 
       const saved = await saveSourceDocumentIfNew(doc, db);
       if (saved) {
-        logger.info("Saved incident", {
+        logger.debug("Saved incident", {
+          sourceType: SOURCE_TYPE,
           title: doc.title,
           pinCount: pins.length,
         });
@@ -292,6 +301,7 @@ async function saveIncidents(
       }
     } catch (error) {
       logger.error("Failed to process incident", {
+        sourceType: SOURCE_TYPE,
         eventId,
         error: error instanceof Error ? error.message : String(error),
       });
@@ -304,7 +314,7 @@ async function saveIncidents(
  * Main crawler function
  */
 async function crawl(): Promise<void> {
-  logger.info("Starting ERM-Zapad crawler");
+  logger.info("Starting crawler", { sourceType: SOURCE_TYPE });
 
   const startTime = Date.now();
   const totalSummary: CrawlSummary = { saved: 0, skipped: 0, failed: 0 };
@@ -314,7 +324,7 @@ async function crawl(): Promise<void> {
     const municipalities = await discoverMunicipalities();
 
     if (municipalities.length === 0) {
-      logger.warn("No София-град municipalities found");
+      logger.warn("No София-град municipalities found", { sourceType: SOURCE_TYPE });
       return;
     }
 
@@ -330,11 +340,12 @@ async function crawl(): Promise<void> {
       }
     }
 
-    logger.info("Total pins extracted", { count: allPins.length });
+    logger.debug("Total pins extracted", { sourceType: SOURCE_TYPE, count: allPins.length });
 
     // Deduplicate globally across all municipalities
     const uniquePins = deduplicatePinRecords(allPins);
-    logger.info("Unique pins after deduplication", {
+    logger.debug("Unique pins after deduplication", {
+      sourceType: SOURCE_TYPE,
       uniqueCount: uniquePins.length,
       removedDuplicates: allPins.length - uniquePins.length,
     });
@@ -342,7 +353,8 @@ async function crawl(): Promise<void> {
     // Group pins by eventId to handle potential duplicates across municipalities
     const incidentMap = groupPinsByEventId(uniquePins);
 
-    logger.info("Incidents after grouping", {
+    logger.debug("Incidents after grouping", {
+      sourceType: SOURCE_TYPE,
       incidentCount: incidentMap.size,
       totalPins: uniquePins.length,
     });
@@ -357,7 +369,10 @@ async function crawl(): Promise<void> {
     // Final summary
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     logger.info("Crawl complete", {
+      sourceType: SOURCE_TYPE,
       durationSeconds: duration,
+      municipalities: municipalities.length,
+      incidents: incidentMap.size,
       saved: totalSummary.saved,
       skipped: totalSummary.skipped,
       failed: totalSummary.failed,
@@ -369,11 +384,12 @@ async function crawl(): Promise<void> {
       totalSummary.saved === 0 &&
       totalSummary.skipped === 0
     ) {
-      logger.error("All pins failed to process");
+      logger.error("All pins failed to process", { sourceType: SOURCE_TYPE });
       process.exit(1);
     }
   } catch (error) {
     logger.error("Crawl failed", {
+      sourceType: SOURCE_TYPE,
       error: error instanceof Error ? error.message : String(error),
     });
     process.exit(1);

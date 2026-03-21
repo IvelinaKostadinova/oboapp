@@ -55,7 +55,9 @@ export async function crawl(): Promise<void> {
     noWarnings: 0,
   };
 
-  logger.info("Fetching weather warnings", { url: TARGET_URL });
+  logger.info("Starting crawler", { sourceType: SOURCE_TYPE });
+
+  logger.debug("Fetching weather warnings", { sourceType: SOURCE_TYPE, url: TARGET_URL });
 
   // Launch browser and fetch HTML
   const browser = await launchBrowser();
@@ -66,25 +68,25 @@ export async function crawl(): Promise<void> {
     const html = await page.content();
     await browser.close();
 
-    logger.info("Parsing weather warnings");
+    logger.debug("Parsing weather warnings", { sourceType: SOURCE_TYPE });
 
     // Parse the page
     const pageData = parseWeatherPage(html);
 
     if (!pageData) {
-      logger.error("Failed to parse weather page");
+      logger.error("Failed to parse weather page", { sourceType: SOURCE_TYPE });
       process.exit(1);
     }
 
     // Check if there are any active warnings
     if (!hasActiveWarnings(pageData)) {
-      logger.info("No active weather warnings for Sofia");
+      logger.debug("No active weather warnings for Sofia", { sourceType: SOURCE_TYPE });
       summary.noWarnings++;
       printSummary(summary);
       return;
     }
 
-    logger.info("Found active weather warnings", { forecastDate: pageData.forecastDate });
+    logger.debug("Found active weather warnings", { sourceType: SOURCE_TYPE, forecastDate: pageData.forecastDate });
 
     // Build source document
     const timespan = buildTimespan(pageData.forecastDate);
@@ -123,15 +125,15 @@ export async function crawl(): Promise<void> {
     });
 
     if (saved) {
-      logger.info("Saved weather warning", { title: doc.title });
+      logger.debug("Saved weather warning", { sourceType: SOURCE_TYPE, title: doc.title });
       summary.saved++;
     } else {
-      logger.info("Weather warning already exists", { title: doc.title });
+      logger.debug("Weather warning already exists", { sourceType: SOURCE_TYPE, title: doc.title });
       summary.skipped++;
     }
   } catch (error) {
     await browser.close();
-    logger.error("Failed to crawl weather warnings", { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Failed to crawl weather warnings", { sourceType: SOURCE_TYPE, error: error instanceof Error ? error.message : String(error) });
     summary.failed++;
   }
 
@@ -144,22 +146,14 @@ export async function crawl(): Promise<void> {
 }
 
 function printSummary(summary: CrawlSummary): void {
-  const parts = [`Saved: ${summary.saved}`, `Skipped: ${summary.skipped}`];
-
-  if (summary.noWarnings > 0) {
-    parts.push(`No warnings: ${summary.noWarnings}`);
-  }
-  if (summary.failed > 0) {
-    parts.push(`Failed: ${summary.failed}`);
-  }
-
-  logger.info("Crawl summary", { saved: summary.saved, skipped: summary.skipped, noWarnings: summary.noWarnings, failed: summary.failed });
+  const total = summary.saved + summary.skipped + summary.noWarnings;
+  logger.info("Crawl complete", { sourceType: SOURCE_TYPE, total, saved: summary.saved, skipped: summary.skipped, noWarnings: summary.noWarnings, failed: summary.failed });
 }
 
 // Run if called directly
 if (require.main === module) {
   crawl().catch((error) => {
-    logger.error("Fatal error", { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Fatal error", { sourceType: SOURCE_TYPE, error: error instanceof Error ? error.message : String(error) });
     process.exit(1);
   });
 }
