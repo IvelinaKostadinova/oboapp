@@ -299,7 +299,7 @@ main:
                       except:
                         as: e
                         steps:
-                          - log16:
+                          - log17:
                               call: sys.log
                               args:
                                 text: '${"Crawler vrabnitsa-org failed: " + string(e)}'
