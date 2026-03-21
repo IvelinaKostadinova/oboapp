@@ -45,19 +45,13 @@ describe("vrabnitsa-org/index date parser", () => {
     );
   });
 
-  it("warns before falling back from native Date parsing", () => {
+  it("does not warn for expected Bulgarian month-name dates", () => {
     const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => logger);
 
     const iso = parseVrabnitsaDate("12 март 2026");
     const parsed = new Date(iso);
 
-    expect(warnSpy).toHaveBeenCalledWith(
-      "Unparseable vrabnitsa date with native Date, falling back to parseBulgarianMonthDate",
-      expect.objectContaining({
-        cleanedDateText: "12 март 2026",
-        sourceType: "vrabnitsa-org",
-      }),
-    );
+    expect(warnSpy).not.toHaveBeenCalled();
     expect(parsed.getFullYear()).toBe(2026);
     expect(parsed.getMonth()).toBe(2);
     expect(parsed.getDate()).toBe(12);

@@ -34,20 +34,14 @@ export function parseVrabnitsaDate(dateText: string): string {
     return new Date().toISOString();
   }
 
+  // Try ISO datetime first (from <time datetime="...">)
   const parsedIsoDate = new Date(cleaned);
 
   if (!Number.isNaN(parsedIsoDate.getTime())) {
     return parsedIsoDate.toISOString();
   }
 
-  logger.warn(
-    "Unparseable vrabnitsa date with native Date, falling back to parseBulgarianMonthDate",
-    {
-      cleanedDateText: cleaned,
-      sourceType: SOURCE_TYPE,
-    },
-  );
-
+  // Bulgarian month-name dates are the expected format for this source
   return parseBulgarianMonthDate(cleaned);
 }
 
