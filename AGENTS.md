@@ -304,6 +304,7 @@ All four prompts have eval configs in `ingest/prompts/__evals__/` using [promptf
   2. `ingest/terraform/workflows/all.yaml` - Add crawler to parallel execution step
   3. If emergent crawler (short-lived, 30-min intervals): Also update `ingest/terraform/workflows/emergent.yaml` and `EMERGENT_CRAWLERS` in `ingest/pipeline.ts`
   4. `ingest/pipeline.ts` syncs automatically (discovers crawlers from filesystem)
+- **Unique `logN` Step Names (CRITICAL):** Each error-handler step in `all.yaml` and `emergent.yaml` uses a sequential `logN` name (e.g., `log1`, `log2`, …). GCP Workflows requires these names to be **unique within each file**. When adding a new crawler, **read the file first** and find the current highest `logN` number, then use `logN+1`. Never guess — always verify against the file. Numbering resets per file (`all.yaml` and `emergent.yaml` each start from `log1`).
 - **Emergent Classification:** Emergent crawlers (erm-zapad, toplo-bg, sofiyska-voda) run every 30 minutes. All others run 3x daily. This classification affects workflow definitions and Cloud Scheduler.
 
 ### Geocoding Services
