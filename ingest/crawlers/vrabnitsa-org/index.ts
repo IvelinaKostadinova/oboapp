@@ -28,7 +28,10 @@ export function parseVrabnitsaDate(dateText: string): string {
       originalText: dateText,
       sourceType: SOURCE_TYPE,
     });
-    return parseBulgarianMonthDate(cleaned);
+    // Avoid calling parseBulgarianMonthDate with an empty string to prevent
+    // duplicate warnings and implicit "current date" fallback in the helper.
+    // Instead, explicitly fall back to the current date here.
+    return new Date().toISOString();
   }
 
   const parsedIsoDate = new Date(cleaned);
