@@ -299,7 +299,7 @@ main:
                       except:
                         as: e
                         steps:
-                          - log18:
+                          - log17:
                               call: sys.log
                               args:
                                 text: '${"Crawler vrabnitsa-org failed: " + string(e)}'
@@ -314,7 +314,7 @@ main:
         except:
           as: e
           steps:
-            - log19:
+            - log18:
                 call: sys.log
                 args:
                   text: '${"Ingest failed: " + string(e)}'
