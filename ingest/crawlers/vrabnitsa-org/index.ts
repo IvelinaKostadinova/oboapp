@@ -20,13 +20,30 @@ const SOURCE_TYPE = "vrabnitsa-org";
 const LOCALITY = "bg.sofia";
 const DELAY_BETWEEN_REQUESTS = 2000;
 
-function parseVrabnitsaDate(dateText: string): string {
+export function parseVrabnitsaDate(dateText: string): string {
   const cleaned = dateText.replace(/^Публикувано:\s*/i, "").trim();
+
+  if (!cleaned) {
+    logger.warn("Empty date text when parsing vrabnitsa date", {
+      originalText: dateText,
+      sourceType: SOURCE_TYPE,
+    });
+    return parseBulgarianMonthDate(cleaned);
+  }
+
   const parsedIsoDate = new Date(cleaned);
 
   if (!Number.isNaN(parsedIsoDate.getTime())) {
     return parsedIsoDate.toISOString();
   }
+
+  logger.warn(
+    "Unparseable vrabnitsa date with native Date, falling back to parseBulgarianMonthDate",
+    {
+      cleanedDateText: cleaned,
+      sourceType: SOURCE_TYPE,
+    },
+  );
 
   return parseBulgarianMonthDate(cleaned);
 }
@@ -61,6 +78,7 @@ if (require.main === module) {
   crawl().catch((error) => {
     logger.error("Fatal error", {
       error: error instanceof Error ? error.message : String(error),
+      sourceType: SOURCE_TYPE,
     });
     process.exit(1);
   });
