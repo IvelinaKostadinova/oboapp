@@ -39,7 +39,7 @@ Google Cloud Workflows
 2. **All Workflow** (`pipeline-all`)
    - **Crawlers**: All currently deployed crawlers
    - **Schedule**: 3 times daily at 10:00 AM, 2:00 PM, 4:00 PM (Europe/Sofia timezone)
-     - **Use case**: Long-term construction/repair projects and municipal announcements from district administrations
+   - **Use case**: Long-term construction/repair projects and municipal announcements from district administrations
 
 ## Workflow Execution Flow
 
