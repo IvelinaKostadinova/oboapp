@@ -319,7 +319,7 @@ main:
                           - log18:
                               call: sys.log
                               args:
-                                text: '${"Crawler nadezhda failed: " + string(e)}'
+                                text: '${"Crawler nadezhda-org failed: " + string(e)}'
                                 severity: "ERROR"
     - ingest:
         try:
@@ -346,7 +346,7 @@ main:
         except:
           as: e
           steps:
-            - log19:
+            - log20:
                 call: sys.log
                 args:
                   text: '${"Notify failed: " + string(e)}'
