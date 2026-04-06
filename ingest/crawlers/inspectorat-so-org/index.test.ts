@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { crawl } from "./index";
+import { parseInspectoratDate } from "./index";
 import { extractPostDetails, extractPostLinks } from "./extractors";
 import {
   crawlWordpressPage,
@@ -78,5 +79,27 @@ describe("inspectorat-so-org/index", () => {
     mockedCrawlWordpressPage.mockRejectedValueOnce(new Error("crawl failed"));
 
     await expect(crawl()).rejects.toThrow("crawl failed");
+  });
+
+  describe("parseInspectoratDate", () => {
+    it("parses short month dates as previous year when they are too far in the future", () => {
+      const referenceDate = new Date("2026-01-05T12:00:00+02:00");
+      const iso = parseInspectoratDate("29 дек.", "", referenceDate);
+      const parsed = new Date(iso);
+
+      expect(parsed.getUTCFullYear()).toBe(2025);
+      expect(parsed.getUTCMonth()).toBe(11);
+      expect(parsed.getUTCDate()).toBe(28);
+    });
+
+    it("keeps short month dates in current year when near future threshold", () => {
+      const referenceDate = new Date("2026-04-01T12:00:00+03:00");
+      const iso = parseInspectoratDate("06 апр.", "", referenceDate);
+      const parsed = new Date(iso);
+
+      expect(parsed.getUTCFullYear()).toBe(2026);
+      expect(parsed.getUTCMonth()).toBe(3);
+      expect(parsed.getUTCDate()).toBe(5);
+    });
   });
 });

@@ -18,6 +18,7 @@ const INDEX_URL = "https://inspectorat-so.org/%D0%BD%D0%BE%D0%B2%D0%B8%D0%BD%D0%
 const SOURCE_TYPE = "inspectorat-so-org";
 const LOCALITY = "bg.sofia";
 const DELAY_BETWEEN_REQUESTS = 2000; // 2 seconds
+const MAX_FUTURE_DAYS_FOR_SHORT_DATE = 7;
 
 const BG_MONTH_TO_NUMBER: Record<string, string> = {
   "ян": "01",
@@ -34,7 +35,33 @@ const BG_MONTH_TO_NUMBER: Record<string, string> = {
   "дек": "12",
 };
 
-function parseInspectoratDate(dateText: string, fallbackDateText?: string): string {
+function inferShortDateYear(
+  day: string,
+  month: string,
+  referenceDate: Date,
+): number {
+  const currentYear = referenceDate.getFullYear();
+  const candidateThisYear = new Date(
+    `${currentYear}-${month}-${day}T00:00:00+02:00`,
+  );
+
+  if (Number.isNaN(candidateThisYear.getTime())) {
+    return currentYear;
+  }
+
+  const futureThresholdMs =
+    MAX_FUTURE_DAYS_FOR_SHORT_DATE * 24 * 60 * 60 * 1000;
+  const isTooFarInFuture =
+    candidateThisYear.getTime() - referenceDate.getTime() > futureThresholdMs;
+
+  return isTooFarInFuture ? currentYear - 1 : currentYear;
+}
+
+export function parseInspectoratDate(
+  dateText: string,
+  fallbackDateText?: string,
+  referenceDate = new Date(),
+): string {
   const candidate = (dateText || fallbackDateText || "").replace(/\s+/g, " ").trim();
 
   const directMatch = candidate.match(/(\d{1,2})[./](\d{1,2})[./](\d{2,4})/);
@@ -57,7 +84,7 @@ function parseInspectoratDate(dateText: string, fallbackDateText?: string): stri
 
     if (mappedMonth) {
       const day = dayRaw.padStart(2, "0");
-      const year = new Date().getFullYear();
+      const year = inferShortDateYear(day, mappedMonth, referenceDate);
       const parsed = new Date(`${year}-${mappedMonth}-${day}T00:00:00+02:00`);
       if (!Number.isNaN(parsed.getTime())) {
         return parsed.toISOString();
