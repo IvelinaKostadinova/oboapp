@@ -456,14 +456,8 @@ export default function HomeContent() {
 
   // Center map on selected message's geometry when detail view opens (only once per message)
   useEffect(() => {
-    // Require a selected message with valid id, geometry and a ready map/navigation handler
-    if (
-      !selectedMessage?.id ||
-      !selectedMessage.geoJson ||
-      !handleAddressClick ||
-      !centerMapFn ||
-      !mapInstance
-    ) {
+    // Require only selected message geometry and a ready map instance for bounds fitting.
+    if (!selectedMessage?.id || !selectedMessage.geoJson || !mapInstance) {
       return;
     }
 
@@ -484,7 +478,7 @@ export default function HomeContent() {
     }
 
     const centroid = getFeaturesCentroid(selectedMessage.geoJson);
-    if (centroid) {
+    if (centroid && handleAddressClick) {
       suppressNextViewportFetch();
       handleAddressClick(centroid.lat, centroid.lng);
       lastCenteredMessageIdRef.current = selectedMessage.id;
@@ -492,7 +486,6 @@ export default function HomeContent() {
   }, [
     selectedMessage,
     handleAddressClick,
-    centerMapFn,
     mapInstance,
     suppressNextViewportFetch,
   ]);
