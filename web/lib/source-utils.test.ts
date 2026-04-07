@@ -1,10 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { LOCALITY_ENV_ERROR_MESSAGE } from "@/lib/locality-metadata";
 
 import {
   getCurrentLocalitySources,
   getExperimentalSources,
   getSourcesForLocality,
 } from "./source-utils";
+
+const ORIGINAL_NEXT_PUBLIC_LOCALITY = process.env.NEXT_PUBLIC_LOCALITY;
 
 vi.mock("@/lib/sources", () => ({
   default: [
@@ -48,6 +51,15 @@ describe("source-utils", () => {
     delete process.env.NEXT_PUBLIC_LOCALITY;
   });
 
+  afterAll(() => {
+    if (ORIGINAL_NEXT_PUBLIC_LOCALITY === undefined) {
+      delete process.env.NEXT_PUBLIC_LOCALITY;
+      return;
+    }
+
+    process.env.NEXT_PUBLIC_LOCALITY = ORIGINAL_NEXT_PUBLIC_LOCALITY;
+  });
+
   it("matches exact and hierarchical locality IDs", () => {
     const result = getSourcesForLocality("bg.sofia");
     const ids = result.map((s) => s.id);
@@ -72,7 +84,7 @@ describe("source-utils", () => {
 
   it("throws when NEXT_PUBLIC_LOCALITY is missing", () => {
     expect(() => getCurrentLocalitySources()).toThrow(
-      "NEXT_PUBLIC_LOCALITY environment variable is required but not set",
+      LOCALITY_ENV_ERROR_MESSAGE,
     );
   });
 
