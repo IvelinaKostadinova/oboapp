@@ -987,7 +987,7 @@ describe("geometry-utils", () => {
             type: "Feature",
             geometry: {
               type: "LineString",
-              coordinates: [null, [23.35], [23.36, 42.72]],
+              coordinates: [null, [23.35], ["23.37", 42.73], [23.36, 42.72]],
             },
             properties: {},
           },

@@ -225,12 +225,19 @@ const collectCoordinates = (
       return [];
     }
 
-    return value.filter((coord): coord is number[] => Array.isArray(coord));
+    return value.filter((coord): coord is number[] => {
+      if (!Array.isArray(coord) || coord.length < 2) {
+        return false;
+      }
+
+      const [lng, lat] = coord;
+      return Number.isFinite(lng) && Number.isFinite(lat);
+    });
   };
 
   switch (geometry.type) {
     case "Point":
-      return Array.isArray(geometry.coordinates) ? [geometry.coordinates] : [];
+      return toCoordinatePairs([geometry.coordinates]);
     case "MultiPoint":
     case "LineString":
       return toCoordinatePairs(geometry.coordinates);
@@ -265,15 +272,7 @@ export const getFeaturesBounds = (
     const coordinates = collectCoordinates(feature.geometry);
 
     coordinates.forEach((coord) => {
-      if (!Array.isArray(coord) || coord.length < 2) {
-        return;
-      }
-
       const [lng, lat] = coord;
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-        return;
-      }
-
       north = Math.max(north, lat);
       south = Math.min(south, lat);
       east = Math.max(east, lng);
