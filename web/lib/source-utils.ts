@@ -23,9 +23,12 @@ const isLocalityMatch = (sourceLocality: string, locality: string): boolean => {
 };
 
 /**
- * Get sources applicable to a specific locality
- * @param locality - The locality ID (e.g., "bg.sofia")
- * @returns Array of sources that serve this locality
+ * Get sources applicable to a specific locality.
+ * Matches exact locality IDs and nested sub-localities.
+ * Example: querying "bg.sofia" includes sources with locality
+ * "bg.sofia" and "bg.sofia.oborishte".
+ * @param locality - The base locality ID (e.g., "bg.sofia")
+ * @returns Array of sources that serve this locality or its sub-localities
  */
 export function getSourcesForLocality(locality: string): Source[] {
   return sources.filter((source) =>
