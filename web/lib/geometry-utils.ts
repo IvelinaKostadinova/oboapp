@@ -2,6 +2,7 @@ import center from "@turf/center";
 import { lineString, polygon } from "@turf/helpers";
 import { roundCoordinate } from "@oboapp/shared";
 import type { GeoJSONGeometry, GeoJSONFeatureCollection } from "@/lib/types";
+import type { ViewportBounds } from "@/lib/bounds-utils";
 
 /**
  * Convert GeoJSON coordinate to Google Maps LatLng format
@@ -212,13 +213,6 @@ export const getFeaturesCentroid = (
   return { lat: roundCoordinate(avgLat), lng: roundCoordinate(avgLng) };
 };
 
-interface GeoBounds {
-  north: number;
-  south: number;
-  east: number;
-  west: number;
-}
-
 const collectCoordinates = (
   geometry: GeoJSONGeometry | null | undefined,
 ): number[][] => {
@@ -257,7 +251,7 @@ const collectCoordinates = (
  */
 export const getFeaturesBounds = (
   geoJson: GeoJSONFeatureCollection | undefined | null,
-): GeoBounds | null => {
+): ViewportBounds | null => {
   const features = geoJson?.features;
   if (!features || features.length === 0) return null;
 
