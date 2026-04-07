@@ -3,6 +3,16 @@ import sources from "@/lib/sources";
 /** Mutable source type derived from the web-facing sources module (avoids readonly field incompatibilities). */
 export type Source = (typeof sources)[number];
 
+const isLocalityMatch = (sourceLocality: string, locality: string): boolean => {
+  // Support hierarchical locality IDs, e.g. source "bg.sofia.oborishte"
+  // should match instance locality "bg.sofia".
+  if (sourceLocality === locality) {
+    return true;
+  }
+
+  return sourceLocality.startsWith(`${locality}.`);
+};
+
 /**
  * Get sources applicable to a specific locality
  * @param locality - The locality ID (e.g., "bg.sofia")
@@ -10,7 +20,9 @@ export type Source = (typeof sources)[number];
  */
 export function getSourcesForLocality(locality: string): Source[] {
   return sources.filter((source) =>
-    source.localities.includes(locality),
+    source.localities.some((sourceLocality) =>
+      isLocalityMatch(sourceLocality, locality),
+    ),
   );
 }
 
