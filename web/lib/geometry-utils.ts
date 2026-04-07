@@ -219,15 +219,33 @@ interface GeoBounds {
   west: number;
 }
 
-const collectCoordinates = (geometry: GeoJSONGeometry): number[][] => {
+const collectCoordinates = (
+  geometry: GeoJSONGeometry | null | undefined,
+): number[][] => {
+  if (!geometry) {
+    return [];
+  }
+
+  const toCoordinatePairs = (value: unknown): number[][] => {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value.filter((coord): coord is number[] => Array.isArray(coord));
+  };
+
   switch (geometry.type) {
     case "Point":
-      return [geometry.coordinates];
+      return Array.isArray(geometry.coordinates) ? [geometry.coordinates] : [];
     case "MultiPoint":
     case "LineString":
-      return geometry.coordinates;
+      return toCoordinatePairs(geometry.coordinates);
     case "Polygon":
-      return geometry.coordinates.flat();
+      if (!Array.isArray(geometry.coordinates)) {
+        return [];
+      }
+
+      return geometry.coordinates.flatMap((ring) => toCoordinatePairs(ring));
     default:
       return [];
   }
@@ -253,6 +271,10 @@ export const getFeaturesBounds = (
     const coordinates = collectCoordinates(feature.geometry);
 
     coordinates.forEach((coord) => {
+      if (!Array.isArray(coord) || coord.length < 2) {
+        return;
+      }
+
       const [lng, lat] = coord;
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
         return;

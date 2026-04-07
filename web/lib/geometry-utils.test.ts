@@ -973,5 +973,33 @@ describe("geometry-utils", () => {
 
       expect(getFeaturesBounds(invalidOnly)).toBeNull();
     });
+
+    it("should ignore malformed geometries and malformed coordinates", () => {
+      const malformed = {
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            geometry: null,
+            properties: {},
+          },
+          {
+            type: "Feature",
+            geometry: {
+              type: "LineString",
+              coordinates: [null, [23.35], [23.36, 42.72]],
+            },
+            properties: {},
+          },
+        ],
+      } as any;
+
+      expect(getFeaturesBounds(malformed)).toEqual({
+        north: 42.72,
+        south: 42.72,
+        east: 23.36,
+        west: 23.36,
+      });
+    });
   });
 });
