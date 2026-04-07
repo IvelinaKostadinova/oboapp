@@ -252,6 +252,19 @@ const collectCoordinates = (
   }
 };
 
+const BOUNDS_ROUNDING_DECIMALS = 6;
+
+const roundOutward = (
+  value: number,
+  direction: "up" | "down",
+  decimals: number = BOUNDS_ROUNDING_DECIMALS,
+): number => {
+  const multiplier = 10 ** decimals;
+  return direction === "up"
+    ? Math.ceil(value * multiplier) / multiplier
+    : Math.floor(value * multiplier) / multiplier;
+};
+
 /**
  * Calculate geographic bounds that contain all coordinates in a FeatureCollection.
  * If those bounds are visible, the convex hull is also fully visible.
@@ -284,9 +297,9 @@ export const getFeaturesBounds = (
   if (!hasValidCoordinate) return null;
 
   return {
-    north: roundCoordinate(north),
-    south: roundCoordinate(south),
-    east: roundCoordinate(east),
-    west: roundCoordinate(west),
+    north: roundOutward(north, "up"),
+    south: roundOutward(south, "down"),
+    east: roundOutward(east, "up"),
+    west: roundOutward(west, "down"),
   };
 };

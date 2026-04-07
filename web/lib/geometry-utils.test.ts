@@ -950,6 +950,42 @@ describe("geometry-utils", () => {
       });
     });
 
+    it("should round bounds outward to avoid clipping coordinates", () => {
+      const geoJson = {
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            geometry: {
+              type: "MultiPoint",
+              coordinates: [
+                [23.1234564, 42.1234564],
+                [23.1234566, 42.1234566],
+              ],
+            },
+            properties: {},
+          },
+        ],
+      } as any;
+
+      const result = getFeaturesBounds(geoJson);
+
+      expect(result).toEqual({
+        north: 42.123457,
+        south: 42.123456,
+        east: 23.123457,
+        west: 23.123456,
+      });
+
+      const coordinates = geoJson.features[0].geometry.coordinates;
+      coordinates.forEach(([lng, lat]: [number, number]) => {
+        expect(result!.north).toBeGreaterThanOrEqual(lat);
+        expect(result!.south).toBeLessThanOrEqual(lat);
+        expect(result!.east).toBeGreaterThanOrEqual(lng);
+        expect(result!.west).toBeLessThanOrEqual(lng);
+      });
+    });
+
     it("should return null for empty or invalid inputs", () => {
       expect(getFeaturesBounds(null)).toBeNull();
       expect(getFeaturesBounds(undefined)).toBeNull();
