@@ -259,10 +259,14 @@ const roundOutward = (
   direction: "up" | "down",
   decimals: number = BOUNDS_ROUNDING_DECIMALS,
 ): number => {
-  const multiplier = 10 ** decimals;
-  return direction === "up"
-    ? Math.ceil(value * multiplier) / multiplier
-    : Math.floor(value * multiplier) / multiplier;
+  const rounded = roundCoordinate(value, decimals);
+  const step = 10 ** -decimals;
+
+  if (direction === "up") {
+    return rounded < value ? rounded + step : rounded;
+  }
+
+  return rounded > value ? rounded - step : rounded;
 };
 
 /**
