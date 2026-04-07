@@ -211,3 +211,67 @@ export const getFeaturesCentroid = (
 
   return { lat: roundCoordinate(avgLat), lng: roundCoordinate(avgLng) };
 };
+
+interface GeoBounds {
+  north: number;
+  south: number;
+  east: number;
+  west: number;
+}
+
+const collectCoordinates = (geometry: GeoJSONGeometry): number[][] => {
+  switch (geometry.type) {
+    case "Point":
+      return [geometry.coordinates];
+    case "MultiPoint":
+    case "LineString":
+      return geometry.coordinates;
+    case "Polygon":
+      return geometry.coordinates.flat();
+    default:
+      return [];
+  }
+};
+
+/**
+ * Calculate geographic bounds that contain all coordinates in a FeatureCollection.
+ * If those bounds are visible, the convex hull is also fully visible.
+ */
+export const getFeaturesBounds = (
+  geoJson: GeoJSONFeatureCollection | undefined | null,
+): GeoBounds | null => {
+  const features = geoJson?.features;
+  if (!features || features.length === 0) return null;
+
+  let north = -Infinity;
+  let south = Infinity;
+  let east = -Infinity;
+  let west = Infinity;
+  let hasValidCoordinate = false;
+
+  features.forEach((feature) => {
+    const coordinates = collectCoordinates(feature.geometry);
+
+    coordinates.forEach((coord) => {
+      const [lng, lat] = coord;
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return;
+      }
+
+      north = Math.max(north, lat);
+      south = Math.min(south, lat);
+      east = Math.max(east, lng);
+      west = Math.min(west, lng);
+      hasValidCoordinate = true;
+    });
+  });
+
+  if (!hasValidCoordinate) return null;
+
+  return {
+    north: roundCoordinate(north),
+    south: roundCoordinate(south),
+    east: roundCoordinate(east),
+    west: roundCoordinate(west),
+  };
+};
