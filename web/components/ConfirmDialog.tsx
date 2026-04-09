@@ -24,6 +24,14 @@ export default function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const handleCancel = () => {
+    if (isConfirming) {
+      return;
+    }
+
+    onCancel();
+  };
+
   if (!isOpen) {
     return null;
   }
@@ -32,7 +40,7 @@ export default function ConfirmDialog({
     <>
       <div
         className={`fixed inset-0 bg-black/40 ${zIndex.modalBackdrop}`}
-        onClick={onCancel}
+        onClick={handleCancel}
         aria-hidden="true"
       />
 
@@ -43,7 +51,7 @@ export default function ConfirmDialog({
         className={`fixed inset-0 ${zIndex.modalContent} m-0 w-full h-full max-w-none max-h-none p-0 border-0 bg-transparent overflow-visible pointer-events-none`}
         onCancel={(event) => {
           event.preventDefault();
-          onCancel();
+          handleCancel();
         }}
       >
         <div className="w-full h-full p-3 sm:p-4 flex items-start sm:items-center justify-center">
@@ -62,7 +70,7 @@ export default function ConfirmDialog({
             <div className="flex gap-3 justify-end">
               <button
                 type="button"
-                onClick={onCancel}
+                onClick={handleCancel}
                 disabled={isConfirming}
                 className={`${buttonSizes.md} ${buttonStyles.secondary} ${borderRadius.sm}`}
               >

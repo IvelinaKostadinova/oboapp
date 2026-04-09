@@ -353,6 +353,7 @@ function HomeContentInner() {
     targetMode,
     pendingNewInterest,
     pendingDeleteInterest,
+    isDeletingInterest,
     selectedInterest,
     interestMenuPosition,
     handleInterestClick,
@@ -722,8 +723,9 @@ function HomeContentInner() {
       <ConfirmDialog
         isOpen={pendingDeleteInterest !== null}
         title="Наистина ли искаш да изтриеш зоната?"
-        description={`Това действие ще изтрие зоната \"${pendingDeleteInterest?.label?.trim() || "тази зона"}\".`}
+        description={`Това действие ще изтрие зоната "${pendingDeleteInterest?.label?.trim() || "тази зона"}".`}
         confirmText="Изтрий зоната"
+        isConfirming={isDeletingInterest}
         onConfirm={() => {
           void handleConfirmDeleteInterest();
         }}

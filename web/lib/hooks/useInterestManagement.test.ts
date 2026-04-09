@@ -127,6 +127,7 @@ describe("useInterestManagement", () => {
       expect(result.current.targetMode).toEqual({ active: false });
       expect(result.current.pendingNewInterest).toBeNull();
       expect(result.current.pendingDeleteInterest).toBeNull();
+      expect(result.current.isDeletingInterest).toBe(false);
       expect(result.current.selectedInterest).toBeNull();
       expect(result.current.interestMenuPosition).toBeNull();
     });
@@ -483,6 +484,61 @@ describe("useInterestManagement", () => {
 
       expect(result.current.pendingDeleteInterest).toBeNull();
       expect(deleteInterest).not.toHaveBeenCalled();
+    });
+
+    it("should ignore duplicate confirm while delete is in flight", async () => {
+      let resolveDelete: (() => void) | undefined;
+      deleteInterest.mockImplementation(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveDelete = resolve;
+          }),
+      );
+
+      const { result } = renderHook(() =>
+        useInterestManagement(
+          centerMapFn,
+          mapInstance,
+          addInterest,
+          updateInterest,
+          deleteInterest,
+        ),
+      );
+
+      const mockInterest = createMockInterest({ id: "dup-confirm" });
+
+      await act(async () => {
+        await result.current.handleDeleteInterest(mockInterest);
+      });
+
+      expect(result.current.pendingDeleteInterest?.id).toBe("dup-confirm");
+
+      act(() => {
+        void result.current.handleConfirmDeleteInterest();
+      });
+
+      expect(result.current.isDeletingInterest).toBe(true);
+
+      act(() => {
+        void result.current.handleConfirmDeleteInterest();
+      });
+
+      expect(deleteInterest).toHaveBeenCalledTimes(1);
+
+      act(() => {
+        result.current.handleCancelDeleteInterest();
+      });
+
+      expect(result.current.pendingDeleteInterest?.id).toBe("dup-confirm");
+
+      await act(async () => {
+        resolveDelete?.();
+      });
+
+      await waitFor(() => {
+        expect(result.current.isDeletingInterest).toBe(false);
+      });
+      expect(result.current.pendingDeleteInterest).toBeNull();
     });
   });
 

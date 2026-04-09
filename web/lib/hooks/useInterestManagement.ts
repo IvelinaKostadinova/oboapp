@@ -66,6 +66,7 @@ export function useInterestManagement(
   );
   const [pendingDeleteInterest, setPendingDeleteInterest] =
     useState<InterestWithId | null>(null);
+  const [isDeletingInterest, setIsDeletingInterest] = useState(false);
   const [interestMenuPosition, setInterestMenuPosition] = useState<{
     x: number;
     y: number;
@@ -211,17 +212,26 @@ export function useInterestManagement(
   );
 
   const handleConfirmDeleteInterest = useCallback(async () => {
-    if (!pendingDeleteInterest) {
+    if (!pendingDeleteInterest || isDeletingInterest) {
       return;
     }
 
-    await executeDeleteInterest(pendingDeleteInterest);
-    setPendingDeleteInterest(null);
-  }, [pendingDeleteInterest, executeDeleteInterest]);
+    setIsDeletingInterest(true);
+    try {
+      await executeDeleteInterest(pendingDeleteInterest);
+      setPendingDeleteInterest(null);
+    } finally {
+      setIsDeletingInterest(false);
+    }
+  }, [pendingDeleteInterest, executeDeleteInterest, isDeletingInterest]);
 
   const handleCancelDeleteInterest = useCallback(() => {
+    if (isDeletingInterest) {
+      return;
+    }
+
     setPendingDeleteInterest(null);
-  }, []);
+  }, [isDeletingInterest]);
 
   const handleStartAddInterest = useCallback(
     (config?: { color?: string; radius?: number }) => {
@@ -305,6 +315,7 @@ export function useInterestManagement(
     targetMode,
     pendingNewInterest,
     pendingDeleteInterest,
+    isDeletingInterest,
     selectedInterest,
     interestMenuPosition,
     handleInterestClick,
