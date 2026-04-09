@@ -7,6 +7,7 @@ import CookieConsent from "@/components/CookieConsent";
 import { AuthProvider } from "@/lib/auth-context";
 import QueryProvider from "@/components/QueryProvider";
 import { MSWProvider } from "@/components/MSWProvider";
+import { Toaster } from "sonner";
 
 export default function ClientLayout({
   children,
@@ -34,6 +35,7 @@ export default function ClientLayout({
               />
             </div>
             <CookieConsent />
+            <Toaster position="top-center" richColors />
           </AuthProvider>
         </QueryProvider>
       </div>
