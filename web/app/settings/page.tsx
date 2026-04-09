@@ -213,7 +213,11 @@ export default function SettingsPage() {
   };
 
   const handleConfirmUnsubscribeAll = async () => {
-    if (!user) return;
+    if (!user) {
+      setShowUnsubscribeAllConfirm(false);
+      setIsUnsubscribingAll(false);
+      return;
+    }
     setIsUnsubscribingAll(true);
 
     try {
