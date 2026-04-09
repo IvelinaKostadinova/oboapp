@@ -85,6 +85,7 @@ export function useInterestManagement(
         await deleteInterest(interest.id);
         setInterestMenuPosition(null);
         setSelectedInterest(null);
+        return true;
       } catch (error) {
         console.error("Failed to delete interest:", error);
 
@@ -99,9 +100,11 @@ export function useInterestManagement(
           setSelectedInterest(null);
           // Refresh to sync state
           globalThis.location.reload();
-        } else {
-          toast.error("Не успях да изтрия зоната. Опитай пак.");
+          return true;
         }
+
+        toast.error("Не успях да изтрия зоната. Опитай пак.");
+        return false;
       }
     },
     [deleteInterest],
@@ -218,8 +221,10 @@ export function useInterestManagement(
 
     setIsDeletingInterest(true);
     try {
-      await executeDeleteInterest(pendingDeleteInterest);
-      setPendingDeleteInterest(null);
+      const deleteSucceeded = await executeDeleteInterest(pendingDeleteInterest);
+      if (deleteSucceeded) {
+        setPendingDeleteInterest(null);
+      }
     } finally {
       setIsDeletingInterest(false);
     }

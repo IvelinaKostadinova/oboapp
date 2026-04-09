@@ -457,6 +457,7 @@ describe("useInterestManagement", () => {
         "Не успях да изтрия зоната. Опитай пак.",
       );
       expect(mockReload).not.toHaveBeenCalled();
+      expect(result.current.pendingDeleteInterest?.id).toBe("test-id");
     });
 
     it("should clear pending delete when cancelled", async () => {

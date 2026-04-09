@@ -9,6 +9,7 @@ interface ConfirmDialogProps {
   readonly title: string;
   readonly description?: string;
   readonly confirmText: string;
+  readonly confirmingText?: string;
   readonly cancelText?: string;
   readonly isConfirming?: boolean;
   readonly onConfirm: () => void;
@@ -20,6 +21,7 @@ export default function ConfirmDialog({
   title,
   description,
   confirmText,
+  confirmingText = "Обработване...",
   cancelText = "Отказ",
   isConfirming = false,
   onConfirm,
@@ -144,7 +146,7 @@ export default function ConfirmDialog({
                 disabled={isConfirming}
                 className={`${buttonSizes.md} ${buttonStyles.destructive} ${borderRadius.sm}`}
               >
-                {isConfirming ? "Изпращане..." : confirmText}
+                {isConfirming ? confirmingText : confirmText}
               </button>
             </div>
           </div>
