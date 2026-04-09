@@ -315,8 +315,8 @@ describe("useInterestManagement", () => {
         ),
       );
 
-      await act(async () => {
-        await result.current.handleDeleteInterest();
+      act(() => {
+        result.current.handleDeleteInterest();
       });
 
       expect(deleteInterest).not.toHaveBeenCalled();
@@ -341,8 +341,8 @@ describe("useInterestManagement", () => {
         result.current.handleInterestClick(mockInterest);
       });
 
-      await act(async () => {
-        await result.current.handleDeleteInterest();
+      act(() => {
+        result.current.handleDeleteInterest();
       });
 
       expect(result.current.pendingDeleteInterest?.id).toBe("test-id");
@@ -377,8 +377,8 @@ describe("useInterestManagement", () => {
 
       const mockInterest = createMockInterest({ id: "from-list-delete" });
 
-      await act(async () => {
-        await result.current.handleDeleteInterest(mockInterest);
+      act(() => {
+        result.current.handleDeleteInterest(mockInterest);
       });
 
       expect(result.current.pendingDeleteInterest?.id).toBe("from-list-delete");
@@ -412,8 +412,8 @@ describe("useInterestManagement", () => {
         result.current.handleInterestClick(mockInterest);
       });
 
-      await act(async () => {
-        await result.current.handleDeleteInterest();
+      act(() => {
+        result.current.handleDeleteInterest();
       });
 
       await act(async () => {
@@ -445,8 +445,8 @@ describe("useInterestManagement", () => {
         result.current.handleInterestClick(mockInterest);
       });
 
-      await act(async () => {
-        await result.current.handleDeleteInterest();
+      act(() => {
+        result.current.handleDeleteInterest();
       });
 
       await act(async () => {
@@ -473,8 +473,8 @@ describe("useInterestManagement", () => {
 
       const mockInterest = createMockInterest({ id: "cancel-delete" });
 
-      await act(async () => {
-        await result.current.handleDeleteInterest(mockInterest);
+      act(() => {
+        result.current.handleDeleteInterest(mockInterest);
       });
 
       expect(result.current.pendingDeleteInterest?.id).toBe("cancel-delete");
@@ -508,8 +508,8 @@ describe("useInterestManagement", () => {
 
       const mockInterest = createMockInterest({ id: "dup-confirm" });
 
-      await act(async () => {
-        await result.current.handleDeleteInterest(mockInterest);
+      act(() => {
+        result.current.handleDeleteInterest(mockInterest);
       });
 
       expect(result.current.pendingDeleteInterest?.id).toBe("dup-confirm");

@@ -199,7 +199,7 @@ export function useInterestManagement(
   );
 
   const handleDeleteInterest = useCallback(
-    async (interestToDelete?: Interest) => {
+    (interestToDelete?: Interest) => {
       const interest = interestToDelete ?? selectedInterest;
       if (!interest?.id) {
         console.error("Cannot delete interest without id", { interest });
