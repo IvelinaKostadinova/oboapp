@@ -24,6 +24,15 @@ describe("bounds", () => {
         east: 23.528,
       });
     });
+
+    it("should have Burgas boundaries", () => {
+      expect(BOUNDS["bg.burgas"]).toEqual({
+        south: 42.412214,
+        west: 27.318265,
+        north: 42.650358,
+        east: 27.570475,
+      });
+    });
   });
 
   describe("CENTERS registry", () => {
@@ -31,6 +40,13 @@ describe("bounds", () => {
       expect(CENTERS["bg.sofia"]).toEqual({
         lat: 42.6977,
         lng: 23.3219,
+      });
+    });
+
+    it("should have Burgas center", () => {
+      expect(CENTERS["bg.burgas"]).toEqual({
+        lat: 42.4936616,
+        lng: 27.4721276,
       });
     });
   });
@@ -42,12 +58,24 @@ describe("bounds", () => {
         description: "Следи събитията в София",
       });
     });
+
+    it("should have Burgas metadata", () => {
+      expect(LOCALITY_METADATA["bg.burgas"]).toMatchObject({
+        name: "Бургас",
+        description: "Следи събитията в Бургас",
+      });
+    });
   });
 
   describe("getLocalityMetadata", () => {
     it("should return metadata for Sofia", () => {
       const metadata = getLocalityMetadata("bg.sofia");
       expect(metadata.name).toBe("София");
+    });
+
+    it("should return metadata for Burgas", () => {
+      const metadata = getLocalityMetadata("bg.burgas");
+      expect(metadata.name).toBe("Бургас");
     });
 
     it("should throw for unknown locality", () => {
