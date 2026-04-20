@@ -66,6 +66,21 @@ describe("burgas-org/extractors", () => {
       expect(posts[0].url).toContain("obyavi-i-saobshteniya");
     });
 
+    it("excludes keyword-matching posts from non-allowlisted sections", async () => {
+      const mockEvaluate = vi.fn().mockResolvedValue([
+        {
+          url: "https://www.burgas.bg/bg/kultura/remont-na-ulitsa-v-tsentralna-gradska-chast",
+          title: "Ремонт на улица в централна градска част",
+          date: "Понеделник, 20 Април 2026",
+        },
+      ]);
+
+      const page = createMockPage(mockEvaluate) as any;
+      const posts = await extractPostLinks(page);
+
+      expect(posts).toEqual([]);
+    });
+
     it("returns an empty list when no relevant posts are found", async () => {
       const mockEvaluate = vi.fn().mockResolvedValue([
         {
