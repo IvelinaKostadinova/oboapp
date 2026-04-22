@@ -8,7 +8,7 @@ import { parseBulgarianMonthDate } from "../shared/date-utils";
 import { PostLink } from "./types";
 import { extractPostDetails, extractPostLinks } from "./extractors";
 import {
-  crawlWordpressPage,
+  crawlWordpressPages,
   processWordpressPost,
 } from "../shared/webpage-crawlers";
 import { logger } from "@/lib/logger";
@@ -16,7 +16,7 @@ import { logger } from "@/lib/logger";
 dotenv.config({ path: resolve(process.cwd(), ".env.local") });
 
 const INDEX_URLS = [
-  "https://www.burgas.bg/bg/novini",
+  "https://www.burgas.bg/bg/novini-stroitelstvo",
   "https://www.burgas.bg/bg/obyavi-i-saobshteniya",
   "https://www.burgas.bg/bg/kulturna-programa",
   "https://www.burgas.bg/bg/sportna-programa",
@@ -49,15 +49,13 @@ const processPost = (browser: Browser, postLink: PostLink, db: OboDb) =>
   );
 
 export async function crawl(): Promise<void> {
-  for (const indexUrl of INDEX_URLS) {
-    await crawlWordpressPage({
-      indexUrl,
-      sourceType: SOURCE_TYPE,
-      extractPostLinks,
-      processPost,
-      delayBetweenRequests: DELAY_BETWEEN_REQUESTS,
-    });
-  }
+  await crawlWordpressPages({
+    indexUrls: INDEX_URLS,
+    sourceType: SOURCE_TYPE,
+    extractPostLinks,
+    processPost,
+    delayBetweenRequests: DELAY_BETWEEN_REQUESTS,
+  });
 }
 
 if (require.main === module) {

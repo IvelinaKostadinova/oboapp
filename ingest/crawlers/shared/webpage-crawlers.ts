@@ -129,8 +129,6 @@ export async function crawlWordpressPage(options: {
     db: OboDb,
   ) => Promise<void>;
   delayBetweenRequests?: number;
-  waitUntil?: "load" | "domcontentloaded" | "networkidle";
-  browser?: Browser;
 }): Promise<void> {
   const {
     indexUrl,
@@ -142,6 +140,68 @@ export async function crawlWordpressPage(options: {
     browser: providedBrowser,
   } = options;
 
+  await crawlWordpressPages({
+    indexUrls: [indexUrl],
+    sourceType,
+    extractPostLinks,
+    processPost,
+    delayBetweenRequests: _delayBetweenRequests,
+  });
+}
+
+/**
+ * Crawl multiple WordPress-style index pages while reusing a single browser/db session
+ */
+export async function crawlWordpressPages(options: {
+  indexUrls: readonly string[];
+  sourceType: string;
+  extractPostLinks: (page: Page) => Promise<PostLink[]>;
+  processPost: (
+    browser: Browser,
+    postLink: PostLink,
+    db: OboDb,
+  ) => Promise<void>;
+  delayBetweenRequests?: number;
+}): Promise<void> {
+  const {
+    indexUrls,
+    sourceType,
+    extractPostLinks,
+    processPost,
+    delayBetweenRequests: _delayBetweenRequests = 2000,
+  } = options;
+
+  await crawlWordpressPages({
+    indexUrls: [indexUrl],
+    sourceType,
+    extractPostLinks,
+    processPost,
+    delayBetweenRequests: _delayBetweenRequests,
+  });
+}
+
+/**
+ * Crawl multiple WordPress-style index pages while reusing a single browser/db session
+ */
+export async function crawlWordpressPages(options: {
+  indexUrls: readonly string[];
+  sourceType: string;
+  extractPostLinks: (page: Page) => Promise<PostLink[]>;
+  processPost: (
+    browser: Browser,
+    postLink: PostLink,
+    db: OboDb,
+  ) => Promise<void>;
+  delayBetweenRequests?: number;
+}): Promise<void> {
+  const {
+    indexUrls,
+    sourceType,
+    extractPostLinks,
+    processPost,
+    delayBetweenRequests: _delayBetweenRequests = 2000,
+  } = options;
+
   logger.info("Starting crawler", { sourceType });
 
   const { getDb } = await import("@/lib/db");
@@ -151,42 +211,52 @@ export async function crawlWordpressPage(options: {
   const ownsBrowser = !providedBrowser;
 
   try {
-    browser = providedBrowser ?? (await launchBrowser());
-
-    const page = await browser.newPage();
-    logger.debug("Fetching index page", { sourceType, url: indexUrl });
-    await page.goto(indexUrl, { waitUntil: waitUntil ?? "networkidle" });
-
-    const postLinks = await extractPostLinks(page);
-    await page.close();
-
-    if (postLinks.length === 0) {
-      logger.warn("No posts found on index page", { sourceType });
-      return;
-    }
+    browser = await launchBrowser();
 
     let savedCount = 0;
     let skippedCount = 0;
     let failedCount = 0;
+    let totalCount = 0;
 
-    for (const postLink of postLinks) {
-      try {
-        const wasProcessed = await isUrlProcessed(postLink.url, db);
+    for (const indexUrl of indexUrls) {
+      const page = await browser.newPage();
+      logger.debug("Fetching index page", { sourceType, url: indexUrl });
 
-        if (wasProcessed) {
-          skippedCount++;
-          logger.debug("Skipped already processed post", { sourceType, title: postLink.title.substring(0, 60) });
-        } else {
-          await processPost(browser, postLink, db);
-          savedCount++;
+      const postLinks = await (async () => {
+        try {
+          await page.goto(indexUrl, { waitUntil: "networkidle" });
+          return await extractPostLinks(page);
+        } finally {
+          await page.close();
         }
-      } catch (error) {
-        failedCount++;
-        logger.error("Error processing post", { sourceType, url: postLink.url, error: error instanceof Error ? error.message : String(error) });
+      })();
+
+      if (postLinks.length === 0) {
+        logger.warn("No posts found on index page", { sourceType, url: indexUrl });
+        continue;
+      }
+
+      totalCount += postLinks.length;
+
+      for (const postLink of postLinks) {
+        try {
+          const wasProcessed = await isUrlProcessed(postLink.url, db);
+
+          if (wasProcessed) {
+            skippedCount++;
+            logger.debug("Skipped already processed post", { sourceType, title: postLink.title.substring(0, 60) });
+          } else {
+            await processPost(browser, postLink, db);
+            savedCount++;
+          }
+        } catch (error) {
+          failedCount++;
+          logger.error("Error processing post", { sourceType, url: postLink.url, error: error instanceof Error ? error.message : String(error) });
+        }
       }
     }
 
-    logger.info("Crawl complete", { sourceType, total: postLinks.length, saved: savedCount, skipped: skippedCount, failed: failedCount });
+    logger.info("Crawl complete", { sourceType, total: totalCount, saved: savedCount, skipped: skippedCount, failed: failedCount });
   } catch (error) {
     logger.error("Crawl failed", { sourceType, error: error instanceof Error ? error.message : String(error) });
     throw error;
