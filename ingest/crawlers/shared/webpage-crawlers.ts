@@ -136,39 +136,6 @@ export async function crawlWordpressPage(options: {
     extractPostLinks,
     processPost,
     delayBetweenRequests: _delayBetweenRequests = 2000,
-    waitUntil,
-    browser: providedBrowser,
-  } = options;
-
-  await crawlWordpressPages({
-    indexUrls: [indexUrl],
-    sourceType,
-    extractPostLinks,
-    processPost,
-    delayBetweenRequests: _delayBetweenRequests,
-  });
-}
-
-/**
- * Crawl multiple WordPress-style index pages while reusing a single browser/db session
- */
-export async function crawlWordpressPages(options: {
-  indexUrls: readonly string[];
-  sourceType: string;
-  extractPostLinks: (page: Page) => Promise<PostLink[]>;
-  processPost: (
-    browser: Browser,
-    postLink: PostLink,
-    db: OboDb,
-  ) => Promise<void>;
-  delayBetweenRequests?: number;
-}): Promise<void> {
-  const {
-    indexUrls,
-    sourceType,
-    extractPostLinks,
-    processPost,
-    delayBetweenRequests: _delayBetweenRequests = 2000,
   } = options;
 
   await crawlWordpressPages({
@@ -208,7 +175,6 @@ export async function crawlWordpressPages(options: {
   const db = await getDb();
 
   let browser: Browser | null = null;
-  const ownsBrowser = !providedBrowser;
 
   try {
     browser = await launchBrowser();
@@ -281,7 +247,7 @@ export async function crawlWordpressPages(options: {
     logger.error("Crawl failed", { sourceType, error: error instanceof Error ? error.message : String(error) });
     throw error;
   } finally {
-    if (ownsBrowser && browser) {
+    if (browser) {
       await browser.close();
     }
   }
