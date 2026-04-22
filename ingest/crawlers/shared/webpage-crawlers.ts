@@ -216,20 +216,33 @@ export async function crawlWordpressPages(options: {
     let savedCount = 0;
     let skippedCount = 0;
     let failedCount = 0;
+    let failedIndexCount = 0;
     let totalCount = 0;
 
     for (const indexUrl of indexUrls) {
-      const page = await browser.newPage();
-      logger.debug("Fetching index page", { sourceType, url: indexUrl });
+      let postLinks: PostLink[] = [];
 
-      const postLinks = await (async () => {
-        try {
-          await page.goto(indexUrl, { waitUntil: "networkidle" });
-          return await extractPostLinks(page);
-        } finally {
-          await page.close();
-        }
-      })();
+      try {
+        const page = await browser.newPage();
+        logger.debug("Fetching index page", { sourceType, url: indexUrl });
+
+        postLinks = await (async () => {
+          try {
+            await page.goto(indexUrl, { waitUntil: "networkidle" });
+            return await extractPostLinks(page);
+          } finally {
+            await page.close();
+          }
+        })();
+      } catch (error) {
+        failedIndexCount++;
+        logger.error("Error processing index page", {
+          sourceType,
+          url: indexUrl,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        continue;
+      }
 
       if (postLinks.length === 0) {
         logger.warn("No posts found on index page", { sourceType, url: indexUrl });
@@ -256,7 +269,14 @@ export async function crawlWordpressPages(options: {
       }
     }
 
-    logger.info("Crawl complete", { sourceType, total: totalCount, saved: savedCount, skipped: skippedCount, failed: failedCount });
+    logger.info("Crawl complete", {
+      sourceType,
+      total: totalCount,
+      saved: savedCount,
+      skipped: skippedCount,
+      failed: failedCount,
+      failedIndexes: failedIndexCount,
+    });
   } catch (error) {
     logger.error("Crawl failed", { sourceType, error: error instanceof Error ? error.message : String(error) });
     throw error;
