@@ -55,3 +55,6 @@ package-lock.json
 
 # APM
 apm_modules/
+
+# IDE
+.vscode/
