@@ -260,12 +260,6 @@ locals {
       timeout      = "1800s"
       description  = "Crawl Sofia municipality"
     }
-    burgas = {
-      source       = "burgas-org"
-      memory       = "1Gi"
-      timeout      = "1800s"
-      description  = "Crawl Burgas municipality"
-    }
     sofiyska-voda = {
       source       = "sofiyska-voda"
       memory       = "512Mi"
