@@ -25,6 +25,12 @@ export const BOUNDS: Record<string, BoundsDefinition> = {
     north: 42.83,
     east: 23.528,
   },
+  "bg.burgas": {
+    south: 42.44,
+    west: 27.37,
+    north: 42.59,
+    east: 27.59,
+  },
 };
 
 /**
@@ -32,6 +38,7 @@ export const BOUNDS: Record<string, BoundsDefinition> = {
  */
 export const CENTERS: Record<string, CenterDefinition> = {
   "bg.sofia": { lat: 42.6977, lng: 23.3219 },
+  "bg.burgas": { lat: 42.5048, lng: 27.4626 },
 };
 
 export interface LocalityMetadata {
@@ -46,6 +53,10 @@ export const LOCALITY_METADATA: Record<string, LocalityMetadata> = {
   "bg.sofia": {
     name: "София",
     description: "Следи събитията в София",
+  },
+  "bg.burgas": {
+    name: "Бургас",
+    description: "Следи събитията в Бургас",
   },
 };
 
