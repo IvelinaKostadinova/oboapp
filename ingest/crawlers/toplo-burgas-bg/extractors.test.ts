@@ -23,6 +23,25 @@ function rssItem({
 </item>`;
 }
 
+function rssItemPlainTitle({
+  title,
+  url,
+  pubDate,
+  contentEncoded,
+}: {
+  title: string;
+  url: string;
+  pubDate: string;
+  contentEncoded: string;
+}): string {
+  return `<item>
+  <title>${title}</title>
+  <link>${url}</link>
+  <pubDate>${pubDate}</pubDate>
+  <content:encoded><![CDATA[${contentEncoded}]]></content:encoded>
+</item>`;
+}
+
 function rssFeed(items: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
 <channel>
@@ -93,6 +112,34 @@ describe("toplo-burgas-bg/extractors", () => {
       const items = parseFeedItems(rssFeed(""));
       expect(items).toHaveLength(0);
     });
+
+    it("parses plain-text (non-CDATA) title", () => {
+      const xml = rssFeed(
+        rssItemPlainTitle({
+          title: "Avaria v k-s Izgrev",
+          url: "https://toplo-bs.com/2026/02/11/outage/",
+          pubDate: "Wed, 11 Feb 2026 06:46:03 +0000",
+          contentEncoded: OUTAGE_CONTENT,
+        }),
+      );
+      const items = parseFeedItems(xml);
+      expect(items).toHaveLength(1);
+      expect(items[0].title).toBe("Avaria v k-s Izgrev");
+    });
+
+    it("decodes HTML entities in a plain-text title", () => {
+      const xml = rssFeed(
+        rssItemPlainTitle({
+          title: "Otchitane &#8211; april &amp; may",
+          url: "https://toplo-bs.com/2026/04/01/otchitane/",
+          pubDate: "Wed, 01 Apr 2026 08:00:00 +0000",
+          contentEncoded: OUTAGE_CONTENT,
+        }),
+      );
+      const items = parseFeedItems(xml);
+      expect(items).toHaveLength(1);
+      expect(items[0].title).toBe("Otchitane \u2013 april & may");
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -134,6 +181,10 @@ describe("toplo-burgas-bg/extractors", () => {
     it("converts RFC 2822 pubDate at UTC+3 to ISO 8601 (adjusts to UTC)", () => {
       const result = parseFeedDate("Mon, 20 Apr 2026 14:38:28 +0300");
       expect(result).toBe("2026-04-20T11:38:28.000Z");
+    });
+
+    it("throws an informative error for an invalid pubDate", () => {
+      expect(() => parseFeedDate("not a date")).toThrow("Invalid RSS pubDate");
     });
   });
 });

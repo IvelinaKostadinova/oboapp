@@ -128,5 +128,9 @@ export function extractContentHtml(contentEncoded: string): string {
  * e.g. "Thu, 23 Apr 2026 07:09:42 +0000" → "2026-04-23T07:09:42.000Z"
  */
 export function parseFeedDate(pubDate: string): string {
-  return new Date(pubDate).toISOString();
+  const parsedDate = new Date(pubDate);
+  if (Number.isNaN(parsedDate.getTime())) {
+    throw new Error(`Invalid RSS pubDate: ${JSON.stringify(pubDate)}`);
+  }
+  return parsedDate.toISOString();
 }
