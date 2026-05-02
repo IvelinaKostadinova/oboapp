@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { fetchFeedXml, parseFeedItems, extractPostDetails } from "./extractors";
+import { fetchFeedXml, parseFeedItems, extractPostDetails, FEED_FETCH_TIMEOUT_MS } from "./extractors";
 
 // ---------------------------------------------------------------------------
 // Helpers for building minimal RSS XML fixtures
@@ -77,6 +77,28 @@ describe("sofia-bg/extractors", () => {
       await expect(
         fetchFeedXml("https://www.sofia.bg/repairs-and-traffic-changes/-/asset_publisher/utdu/rss"),
       ).rejects.toThrow("The operation was aborted.");
+    });
+
+    it("should abort the request after FEED_FETCH_TIMEOUT_MS via AbortController", () => {
+      vi.useFakeTimers();
+      let capturedSignal: AbortSignal | undefined;
+
+      vi.mocked(fetch).mockImplementation((_url, init) => {
+        capturedSignal = (init as RequestInit).signal as AbortSignal;
+        return new Promise(() => {}); // Never resolves — simulates a slow network
+      });
+
+      // async functions run synchronously up to the first `await`, so fetch()
+      // (and the signal capture) happens before the call yields. No need to await.
+      void fetchFeedXml(
+        "https://www.sofia.bg/repairs-and-traffic-changes/-/asset_publisher/utdu/rss",
+      );
+
+      expect(capturedSignal?.aborted).toBe(false);
+      vi.advanceTimersByTime(FEED_FETCH_TIMEOUT_MS);
+      expect(capturedSignal?.aborted).toBe(true);
+
+      vi.useRealTimers();
     });
 
     it("should return XML when response is valid RSS", async () => {

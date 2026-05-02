@@ -3,7 +3,7 @@ import type { PostLink } from "./types";
 import { SELECTORS } from "./selectors";
 import { extractPostDetailsGeneric } from "../shared/extractors";
 
-const FEED_FETCH_TIMEOUT_MS = 30_000;
+export const FEED_FETCH_TIMEOUT_MS = 30_000;
 
 function decodeHtmlEntities(text: string): string {
   return text
