@@ -233,7 +233,6 @@ export async function crawlWordpressPages(options: {
           } else {
             await processPost(browser, postLink, db);
             savedCount++;
-            await delay(delayBetweenRequests);
           }
         } catch (error) {
           failedCount++;
