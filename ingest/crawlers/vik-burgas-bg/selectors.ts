@@ -17,6 +17,6 @@ export const SELECTORS = {
     // Title
     TITLE: "h1",
     // Date — not present on detail pages; injected from listing page in index.ts
-    DATE: "[data-vik-no-date]",
+    DATE: ":not(*)",
   },
 } as const;

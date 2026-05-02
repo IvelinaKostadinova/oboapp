@@ -60,15 +60,6 @@ describe("vik-burgas-bg/extractors", () => {
       expect(posts).toEqual([]);
     });
 
-    it("skips posts with missing date", async () => {
-      const mockEvaluate = vi.fn().mockResolvedValue([]);
-
-      const page = createMockPage(mockEvaluate) as any;
-      const posts = await extractPostLinks(page);
-
-      expect(posts).toEqual([]);
-    });
-
     it("passes correct selectors to page.evaluate", async () => {
       const mockEvaluate = vi.fn().mockResolvedValue([]);
       const page = createMockPage(mockEvaluate) as any;
