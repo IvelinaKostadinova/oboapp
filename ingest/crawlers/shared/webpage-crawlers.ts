@@ -166,7 +166,7 @@ export async function crawlWordpressPages(options: {
     sourceType,
     extractPostLinks,
     processPost,
-    delayBetweenRequests: _delayBetweenRequests = 2000,
+    delayBetweenRequests = 2000,
   } = options;
 
   logger.info("Starting crawler", { sourceType });
@@ -185,7 +185,13 @@ export async function crawlWordpressPages(options: {
     let failedIndexCount = 0;
     let totalCount = 0;
 
+    let isFirstIndex = true;
     for (const indexUrl of indexUrls) {
+      if (!isFirstIndex) {
+        await delay(delayBetweenRequests);
+      }
+      isFirstIndex = false;
+
       let postLinks: PostLink[] = [];
 
       try {
@@ -227,6 +233,7 @@ export async function crawlWordpressPages(options: {
           } else {
             await processPost(browser, postLink, db);
             savedCount++;
+            await delay(delayBetweenRequests);
           }
         } catch (error) {
           failedCount++;
