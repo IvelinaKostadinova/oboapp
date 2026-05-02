@@ -129,6 +129,7 @@ export async function crawlWordpressPage(options: {
     db: OboDb,
   ) => Promise<void>;
   delayBetweenRequests?: number;
+  waitUntil?: "load" | "domcontentloaded" | "networkidle";
 }): Promise<void> {
   const {
     indexUrl,
@@ -136,6 +137,7 @@ export async function crawlWordpressPage(options: {
     extractPostLinks,
     processPost,
     delayBetweenRequests: _delayBetweenRequests = 2000,
+    waitUntil,
   } = options;
 
   await crawlWordpressPages({
@@ -144,6 +146,7 @@ export async function crawlWordpressPage(options: {
     extractPostLinks,
     processPost,
     delayBetweenRequests: _delayBetweenRequests,
+    waitUntil,
   });
 }
 
@@ -160,6 +163,7 @@ export async function crawlWordpressPages(options: {
     db: OboDb,
   ) => Promise<void>;
   delayBetweenRequests?: number;
+  waitUntil?: "load" | "domcontentloaded" | "networkidle";
 }): Promise<void> {
   const {
     indexUrls,
@@ -167,6 +171,7 @@ export async function crawlWordpressPages(options: {
     extractPostLinks,
     processPost,
     delayBetweenRequests = 2000,
+    waitUntil = "networkidle",
   } = options;
 
   logger.info("Starting crawler", { sourceType });
@@ -200,7 +205,7 @@ export async function crawlWordpressPages(options: {
 
         postLinks = await (async () => {
           try {
-            await page.goto(indexUrl, { waitUntil: "networkidle" });
+            await page.goto(indexUrl, { waitUntil });
             return await extractPostLinks(page);
           } finally {
             await page.close();
