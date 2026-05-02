@@ -17,6 +17,7 @@ function decodeHtmlEntities(text: string): string {
 
 /**
  * Fetch the RSS feed XML for the sofia.bg repairs page.
+ * Throws if the response is not an RSS feed (e.g. HTML anti-bot page).
  */
 export async function fetchFeedXml(url: string): Promise<string> {
   const controller = new AbortController();
@@ -29,7 +30,13 @@ export async function fetchFeedXml(url: string): Promise<string> {
     if (!response.ok) {
       throw new Error(`RSS feed returned ${response.status} for ${url}`);
     }
-    return await response.text();
+    const text = await response.text();
+    if (!text.includes("<rss") && !text.includes("<channel>")) {
+      throw new Error(
+        `RSS feed response does not look like RSS (possible anti-bot or error page) for ${url}`,
+      );
+    }
+    return text;
   } finally {
     clearTimeout(timeoutId);
   }

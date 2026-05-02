@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
-import { parseFeedItems, extractPostDetails } from "./extractors";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { fetchFeedXml, parseFeedItems, extractPostDetails } from "./extractors";
 
 // ---------------------------------------------------------------------------
 // Helpers for building minimal RSS XML fixtures
@@ -39,6 +39,60 @@ function createMockPage(mockEvaluate: ReturnType<typeof vi.fn>): MockPage {
 // ---------------------------------------------------------------------------
 
 describe("sofia-bg/extractors", () => {
+  describe("fetchFeedXml", () => {
+    beforeEach(() => {
+      vi.stubGlobal("fetch", vi.fn());
+    });
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it("should throw when response body does not look like RSS", async () => {
+      vi.mocked(fetch).mockResolvedValue({
+        ok: true,
+        text: async () => "<html><body>Access Denied</body></html>",
+      } as Response);
+
+      await expect(
+        fetchFeedXml("https://www.sofia.bg/repairs-and-traffic-changes/-/asset_publisher/utdu/rss"),
+      ).rejects.toThrow("does not look like RSS");
+    });
+
+    it("should throw on non-2xx status", async () => {
+      vi.mocked(fetch).mockResolvedValue({
+        ok: false,
+        status: 403,
+        text: async () => "Forbidden",
+      } as Response);
+
+      await expect(
+        fetchFeedXml("https://www.sofia.bg/repairs-and-traffic-changes/-/asset_publisher/utdu/rss"),
+      ).rejects.toThrow("403");
+    });
+
+    it("should propagate abort error on timeout", async () => {
+      const abortError = new DOMException("The operation was aborted.", "AbortError");
+      vi.mocked(fetch).mockRejectedValue(abortError);
+
+      await expect(
+        fetchFeedXml("https://www.sofia.bg/repairs-and-traffic-changes/-/asset_publisher/utdu/rss"),
+      ).rejects.toThrow("The operation was aborted.");
+    });
+
+    it("should return XML when response is valid RSS", async () => {
+      const rssXml = `<?xml version="1.0"?><rss version="2.0"><channel><title>Test</title></channel></rss>`;
+      vi.mocked(fetch).mockResolvedValue({
+        ok: true,
+        text: async () => rssXml,
+      } as Response);
+
+      const result = await fetchFeedXml(
+        "https://www.sofia.bg/repairs-and-traffic-changes/-/asset_publisher/utdu/rss",
+      );
+      expect(result).toBe(rssXml);
+    });
+  });
+
   describe("parseFeedItems", () => {
     it("should parse a single valid item", () => {
       const xml = wrapInChannel(
