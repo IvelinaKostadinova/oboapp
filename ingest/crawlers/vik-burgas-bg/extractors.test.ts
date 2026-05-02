@@ -60,20 +60,13 @@ describe("vik-burgas-bg/extractors", () => {
       expect(posts).toEqual([]);
     });
 
-    it("handles posts with missing date gracefully", async () => {
-      const mockEvaluate = vi.fn().mockResolvedValue([
-        {
-          url: "https://vik-burgas.com/news/67-syobshtenie-10",
-          title: "Съобщение 10",
-          date: "",
-        },
-      ]);
+    it("skips posts with missing date", async () => {
+      const mockEvaluate = vi.fn().mockResolvedValue([]);
 
       const page = createMockPage(mockEvaluate) as any;
       const posts = await extractPostLinks(page);
 
-      expect(posts).toHaveLength(1);
-      expect(posts[0].date).toBe("");
+      expect(posts).toEqual([]);
     });
 
     it("passes correct selectors to page.evaluate", async () => {

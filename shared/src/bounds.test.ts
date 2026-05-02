@@ -24,6 +24,15 @@ describe("bounds", () => {
         east: 23.528,
       });
     });
+
+    it("should have Burgas boundaries", () => {
+      expect(BOUNDS["bg.burgas"]).toEqual({
+        south: 42.43,
+        west: 27.38,
+        north: 42.6,
+        east: 27.62,
+      });
+    });
   });
 
   describe("CENTERS registry", () => {
@@ -33,6 +42,13 @@ describe("bounds", () => {
         lng: 23.3219,
       });
     });
+
+    it("should have Burgas center", () => {
+      expect(CENTERS["bg.burgas"]).toEqual({
+        lat: 42.5048,
+        lng: 27.4626,
+      });
+    });
   });
 
   describe("LOCALITY_METADATA registry", () => {
@@ -40,6 +56,13 @@ describe("bounds", () => {
       expect(LOCALITY_METADATA["bg.sofia"]).toMatchObject({
         name: "София",
         description: "Следи събитията в София",
+      });
+    });
+
+    it("should have Burgas metadata", () => {
+      expect(LOCALITY_METADATA["bg.burgas"]).toMatchObject({
+        name: "Бургас",
+        description: "Следи събитията в Бургас",
       });
     });
   });

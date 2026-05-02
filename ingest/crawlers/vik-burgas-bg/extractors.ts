@@ -46,6 +46,8 @@ export async function extractPostLinks(page: Page): Promise<PostLink[]> {
           sibling = sibling.nextElementSibling;
         }
 
+        if (!date) continue;
+
         items.push({ url, title, date });
       }
 
