@@ -1,0 +1,11 @@
+geocoding-resolvers:
+  pins:
+    provider: google
+  streets:
+    provider: overpass
+  cadastral-properties:
+    provider: skip
+  bus-stops:
+    provider: skip
+  educational-facilities:
+    provider: skip
