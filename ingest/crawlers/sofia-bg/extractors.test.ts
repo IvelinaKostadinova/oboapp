@@ -193,6 +193,23 @@ describe("sofia-bg/extractors", () => {
     it("should return empty array for empty XML", () => {
       expect(parseFeedItems("")).toEqual([]);
     });
+
+    it("should parse items with CDATA-wrapped title and link", () => {
+      const xml = wrapInChannel(`<item>
+          <title><![CDATA[Ремонт на бул. "Витоша" & ул. "Граф Игнатиев"]]></title>
+          <link><![CDATA[https://www.sofia.bg/repairs-and-traffic-changes/-/asset_publisher/utdu/content/id/12345]]></link>
+          <description />
+          <dc:date>2026-05-01T07:00:00Z</dc:date>
+        </item>`);
+
+      const items = parseFeedItems(xml);
+
+      expect(items).toHaveLength(1);
+      expect(items[0].title).toBe('Ремонт на бул. "Витоша" & ул. "Граф Игнатиев"');
+      expect(items[0].url).toBe(
+        "https://www.sofia.bg/repairs-and-traffic-changes/-/asset_publisher/utdu/content/id/12345",
+      );
+    });
   });
 
   describe("extractPostDetails", () => {

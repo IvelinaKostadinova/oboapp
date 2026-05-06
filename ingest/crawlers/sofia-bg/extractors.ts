@@ -5,6 +5,10 @@ import { extractPostDetailsGeneric } from "../shared/extractors";
 
 export const FEED_FETCH_TIMEOUT_MS = 30_000;
 
+function stripCdata(text: string): string {
+  return text.replace(/^<!\[CDATA\[([\s\S]*?)]]>$/, "$1");
+}
+
 function decodeHtmlEntities(text: string): string {
   return text
     .replace(/&amp;/g, "&")
@@ -56,13 +60,14 @@ export function parseFeedItems(xml: string): PostLink[] {
     const itemXml = m[1];
 
     const title = decodeHtmlEntities(
-      itemXml.match(/<title>([\s\S]*?)<\/title>/)?.[1]?.trim() ?? "",
+      stripCdata(itemXml.match(/<title>([\s\S]*?)<\/title>/)?.[1]?.trim() ?? ""),
     );
     const url = decodeHtmlEntities(
-      itemXml.match(/<link>([\s\S]*?)<\/link>/)?.[1]?.trim() ?? "",
+      stripCdata(itemXml.match(/<link>([\s\S]*?)<\/link>/)?.[1]?.trim() ?? ""),
     );
-    const date =
-      itemXml.match(/<dc:date>([\s\S]*?)<\/dc:date>/)?.[1]?.trim() ?? "";
+    const date = stripCdata(
+      itemXml.match(/<dc:date>([\s\S]*?)<\/dc:date>/)?.[1]?.trim() ?? "",
+    );
 
     if (!title || !url || !date) continue;
 

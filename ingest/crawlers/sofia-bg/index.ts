@@ -50,6 +50,14 @@ export async function crawl(): Promise<void> {
     count: postLinks.length,
   });
 
+  // Deduplicate by URL in case the feed contains duplicate entries.
+  const seen = new Set<string>();
+  postLinks = postLinks.filter((p) => {
+    if (seen.has(p.url)) return false;
+    seen.add(p.url);
+    return true;
+  });
+
   // Build a set of titles already stored for this source type.
   // The RSS feed exposes /content/id/{id} Liferay URLs; the previous crawler
   // stored /w/{slug} URLs. There is no deterministic URL-to-URL mapping, so
@@ -80,7 +88,12 @@ export async function crawl(): Promise<void> {
   );
   const newPostLinks: PostLink[] = [];
   for (const result of settled) {
-    if (result.status === "fulfilled" && !result.value.processed) {
+    if (result.status === "rejected") {
+      logger.warn("Dedup check failed, will attempt to process post", {
+        sourceType: SOURCE_TYPE,
+        error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+      });
+    } else if (!result.value.processed) {
       newPostLinks.push(result.value.postLink);
     }
   }
