@@ -65,14 +65,12 @@ export async function crawl(): Promise<void> {
   // the same title as an RSS item, that article was already processed under
   // the old scheme and must not create a second source document (which would
   // cause from-sources to ingest it again as a duplicate message).
-  // Limit to the most recent 200 docs — enough to cover any overlap between
-  // old /w/{slug} URLs and the new Liferay /content/id/{id} URLs. Once all
-  // old-scheme docs have been superseded this title check can be removed.
+  // Keep this query index-free for Firestore reliability by filtering only on
+  // sourceType and selecting titles without server-side ordering.
+  // Once all old-scheme docs have been superseded this title check can be removed.
   const existingSources = await db.sources.findMany({
     where: [{ field: "sourceType", op: "==", value: SOURCE_TYPE }],
     select: ["title"],
-    orderBy: [{ field: "datePublished", direction: "desc" }],
-    limit: 200,
   });
   const existingTitles = new Set<string>(
     existingSources
