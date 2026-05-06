@@ -30,6 +30,9 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild"
-    ]
+    ],
+    "overrides": {
+      "@xmldom/xmldom": "^0.9.10"
+    }
   }
 }
