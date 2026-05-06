@@ -152,4 +152,10 @@ export const SOURCES: readonly SourceDefinition[] = [
     name: "СДВР",
     localities: ["bg.sofia"],
   },
+  {
+    id: "vik-burgas-bg",
+    url: "https://vik-burgas.com/news",
+    name: "ВиК Бургас",
+    localities: ["bg.burgas"],
+  },
 ];
