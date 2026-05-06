@@ -11,7 +11,7 @@ import { initSentry, flushSentry } from "@/lib/sentry";
 const program = new Command();
 
 // Define crawler groups
-const EMERGENT_CRAWLERS = ["erm-zapad", "toplo-bg", "sofiyska-voda", "sensor-community"];
+const EMERGENT_CRAWLERS = ["erm-zapad", "toplo-bg", "sofiyska-voda", "sensor-community", "toplo-burgas-bg"];
 
 /**
  * Get available crawler sources by reading the crawlers directory

@@ -32,6 +32,12 @@ export const SOURCES: readonly SourceDefinition[] = [
     localities: ["bg.sofia"],
   },
   {
+    id: "toplo-burgas-bg",
+    url: "https://toplo-bs.com/%D0%B0%D0%B2%D0%B0%D1%80%D0%B8%D0%B8/",
+    name: "Топлофикация Бургас",
+    localities: ["bg.burgas"],
+  },
+  {
     id: "sofia-bg",
     url: "https://www.sofia.bg/repairs-and-traffic-changes",
     name: "Столична община",
