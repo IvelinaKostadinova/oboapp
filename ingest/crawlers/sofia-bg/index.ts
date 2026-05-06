@@ -65,9 +65,14 @@ export async function crawl(): Promise<void> {
   // the same title as an RSS item, that article was already processed under
   // the old scheme and must not create a second source document (which would
   // cause from-sources to ingest it again as a duplicate message).
+  // Limit to the most recent 200 docs — enough to cover any overlap between
+  // old /w/{slug} URLs and the new Liferay /content/id/{id} URLs. Once all
+  // old-scheme docs have been superseded this title check can be removed.
   const existingSources = await db.sources.findMany({
     where: [{ field: "sourceType", op: "==", value: SOURCE_TYPE }],
     select: ["title"],
+    orderBy: [{ field: "datePublished", direction: "desc" }],
+    limit: 200,
   });
   const existingTitles = new Set<string>(
     existingSources
@@ -77,27 +82,22 @@ export async function crawl(): Promise<void> {
 
   // Filter out already-processed URLs (or already-seen titles) before
   // launching the browser so that steady-state runs pay no Chromium startup cost.
-  // Each lookup is wrapped in a try/catch so a transient DB error for one item
-  // does not abort the rest; failed lookups are treated as "not processed"
-  // (worst case: a harmless upsert on a duplicate).
-  const deduped = await Promise.all(
-    postLinks.map(async (p) => {
-      let processed = false;
-      try {
-        processed = (await isUrlProcessed(p.url, db)) || existingTitles.has(p.title);
-      } catch (err) {
-        logger.warn("Dedup check failed, will attempt to process post", {
-          sourceType: SOURCE_TYPE,
-          url: p.url,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-      return { postLink: p, processed };
-    }),
-  );
-  const newPostLinks: PostLink[] = deduped
-    .filter((r) => !r.processed)
-    .map((r) => r.postLink);
+  // Lookups are sequential to avoid bursting Firestore read QPS. A failed lookup
+  // is treated as "not processed" (worst case: a harmless upsert on a duplicate).
+  const newPostLinks: PostLink[] = [];
+  for (const p of postLinks) {
+    let processed = false;
+    try {
+      processed = (await isUrlProcessed(p.url, db)) || existingTitles.has(p.title);
+    } catch (err) {
+      logger.warn("Dedup check failed, will attempt to process post", {
+        sourceType: SOURCE_TYPE,
+        url: p.url,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    if (!processed) newPostLinks.push(p);
+  }
 
   const skipped = postLinks.length - newPostLinks.length;
 
