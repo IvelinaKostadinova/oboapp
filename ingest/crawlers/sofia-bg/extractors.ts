@@ -51,7 +51,9 @@ export function parseFeedItems(xml: string): PostLink[] {
     const itemXml = m[1];
 
     const title = decodeHtmlEntities(
-      stripCdata(itemXml.match(/<title>([\s\S]*?)<\/title>/)?.[1]?.trim() ?? ""),
+      stripCdata(
+        itemXml.match(/<title>([\s\S]*?)<\/title>/)?.[1]?.trim() ?? "",
+      ),
     );
     const url = decodeHtmlEntities(
       stripCdata(itemXml.match(/<link>([\s\S]*?)<\/link>/)?.[1]?.trim() ?? ""),

@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { fetchFeedXml, parseFeedItems, extractPostDetails, FEED_FETCH_TIMEOUT_MS } from "./extractors";
+import {
+  fetchFeedXml,
+  parseFeedItems,
+  extractPostDetails,
+  FEED_FETCH_TIMEOUT_MS,
+} from "./extractors";
 
 // ---------------------------------------------------------------------------
 // Helpers for building minimal RSS XML fixtures
@@ -27,7 +32,10 @@ function wrapInChannel(items: string): string {
 
 // Mock Page type from Playwright
 interface MockPage {
-  evaluate: <T>(fn: (...args: unknown[]) => T, ...args: unknown[]) => Promise<T>;
+  evaluate: <T>(
+    fn: (...args: unknown[]) => T,
+    ...args: unknown[]
+  ) => Promise<T>;
 }
 
 function createMockPage(mockEvaluate: ReturnType<typeof vi.fn>): MockPage {
@@ -54,7 +62,9 @@ describe("sofia-bg/extractors", () => {
       } as Response);
 
       await expect(
-        fetchFeedXml("https://www.sofia.bg/repairs-and-traffic-changes/-/asset_publisher/utdu/rss"),
+        fetchFeedXml(
+          "https://www.sofia.bg/repairs-and-traffic-changes/-/asset_publisher/utdu/rss",
+        ),
       ).rejects.toThrow("does not look like RSS");
     });
 
@@ -66,16 +76,23 @@ describe("sofia-bg/extractors", () => {
       } as Response);
 
       await expect(
-        fetchFeedXml("https://www.sofia.bg/repairs-and-traffic-changes/-/asset_publisher/utdu/rss"),
+        fetchFeedXml(
+          "https://www.sofia.bg/repairs-and-traffic-changes/-/asset_publisher/utdu/rss",
+        ),
       ).rejects.toThrow("403");
     });
 
     it("should propagate abort error on timeout", async () => {
-      const abortError = new DOMException("The operation was aborted.", "AbortError");
+      const abortError = new DOMException(
+        "The operation was aborted.",
+        "AbortError",
+      );
       vi.mocked(fetch).mockRejectedValue(abortError);
 
       await expect(
-        fetchFeedXml("https://www.sofia.bg/repairs-and-traffic-changes/-/asset_publisher/utdu/rss"),
+        fetchFeedXml(
+          "https://www.sofia.bg/repairs-and-traffic-changes/-/asset_publisher/utdu/rss",
+        ),
       ).rejects.toThrow("The operation was aborted.");
     });
 
@@ -87,7 +104,9 @@ describe("sofia-bg/extractors", () => {
         capturedSignal = (init as RequestInit).signal as AbortSignal;
         return new Promise((_resolve, reject) => {
           capturedSignal!.addEventListener("abort", () => {
-            reject(new DOMException("The operation was aborted.", "AbortError"));
+            reject(
+              new DOMException("The operation was aborted.", "AbortError"),
+            );
           });
         });
       });
@@ -209,7 +228,9 @@ describe("sofia-bg/extractors", () => {
       const items = parseFeedItems(xml);
 
       expect(items).toHaveLength(1);
-      expect(items[0].title).toBe('Ремонт на бул. "Витоша" & ул. "Граф Игнатиев"');
+      expect(items[0].title).toBe(
+        'Ремонт на бул. "Витоша" & ул. "Граф Игнатиев"',
+      );
       expect(items[0].url).toBe(
         "https://www.sofia.bg/repairs-and-traffic-changes/-/asset_publisher/utdu/content/id/12345",
       );
@@ -289,4 +310,3 @@ describe("sofia-bg/extractors", () => {
     });
   });
 });
-

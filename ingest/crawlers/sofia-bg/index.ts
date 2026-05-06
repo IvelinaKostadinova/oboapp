@@ -88,7 +88,8 @@ export async function crawl(): Promise<void> {
   for (const p of postLinks) {
     let processed = false;
     try {
-      processed = (await isUrlProcessed(p.url, db)) || existingTitles.has(p.title);
+      processed =
+        (await isUrlProcessed(p.url, db)) || existingTitles.has(p.title);
     } catch (err) {
       logger.warn("Dedup check failed, will attempt to process post", {
         sourceType: SOURCE_TYPE,
