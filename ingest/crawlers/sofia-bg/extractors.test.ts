@@ -79,24 +79,28 @@ describe("sofia-bg/extractors", () => {
       ).rejects.toThrow("The operation was aborted.");
     });
 
-    it("should abort the request after FEED_FETCH_TIMEOUT_MS via AbortController", () => {
+    it("should abort the request after FEED_FETCH_TIMEOUT_MS via AbortController", async () => {
       vi.useFakeTimers();
       let capturedSignal: AbortSignal | undefined;
 
       vi.mocked(fetch).mockImplementation((_url, init) => {
         capturedSignal = (init as RequestInit).signal as AbortSignal;
-        return new Promise(() => {}); // Never resolves — simulates a slow network
+        return new Promise((_resolve, reject) => {
+          capturedSignal!.addEventListener("abort", () => {
+            reject(new DOMException("The operation was aborted.", "AbortError"));
+          });
+        });
       });
 
-      // async functions run synchronously up to the first `await`, so fetch()
-      // (and the signal capture) happens before the call yields. No need to await.
-      void fetchFeedXml(
+      const promise = fetchFeedXml(
         "https://www.sofia.bg/repairs-and-traffic-changes/-/asset_publisher/utdu/rss",
       );
 
       expect(capturedSignal?.aborted).toBe(false);
       vi.advanceTimersByTime(FEED_FETCH_TIMEOUT_MS);
       expect(capturedSignal?.aborted).toBe(true);
+
+      await expect(promise).rejects.toThrow("The operation was aborted.");
 
       vi.useRealTimers();
     });
@@ -209,6 +213,28 @@ describe("sofia-bg/extractors", () => {
       expect(items[0].url).toBe(
         "https://www.sofia.bg/repairs-and-traffic-changes/-/asset_publisher/utdu/content/id/12345",
       );
+    });
+
+    it("should skip items with a URL on a different host", () => {
+      const xml = wrapInChannel(
+        buildItemXml(
+          "Malicious Item",
+          "https://evil.example.com/steal",
+          "2026-05-01T07:00:00Z",
+        ),
+      );
+      expect(parseFeedItems(xml)).toHaveLength(0);
+    });
+
+    it("should skip items with an unparseable date", () => {
+      const xml = wrapInChannel(
+        buildItemXml(
+          "Bad Date Item",
+          "https://www.sofia.bg/repairs-and-traffic-changes/-/asset_publisher/utdu/content/id/99",
+          "not-a-date",
+        ),
+      );
+      expect(parseFeedItems(xml)).toHaveLength(0);
     });
   });
 

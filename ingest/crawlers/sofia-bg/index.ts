@@ -77,26 +77,27 @@ export async function crawl(): Promise<void> {
 
   // Filter out already-processed URLs (or already-seen titles) before
   // launching the browser so that steady-state runs pay no Chromium startup cost.
-  // Promise.allSettled is used so that a single failed DB lookup does not abort
-  // the entire pre-filter step; a rejected lookup is treated as "not processed"
-  // so the post is attempted (worst case: a harmless upsert on a duplicate).
-  const settled = await Promise.allSettled(
-    postLinks.map(async (p) => ({
-      postLink: p,
-      processed: (await isUrlProcessed(p.url, db)) || existingTitles.has(p.title),
-    })),
+  // Each lookup is wrapped in a try/catch so a transient DB error for one item
+  // does not abort the rest; failed lookups are treated as "not processed"
+  // (worst case: a harmless upsert on a duplicate).
+  const deduped = await Promise.all(
+    postLinks.map(async (p) => {
+      let processed = false;
+      try {
+        processed = (await isUrlProcessed(p.url, db)) || existingTitles.has(p.title);
+      } catch (err) {
+        logger.warn("Dedup check failed, will attempt to process post", {
+          sourceType: SOURCE_TYPE,
+          url: p.url,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+      return { postLink: p, processed };
+    }),
   );
-  const newPostLinks: PostLink[] = [];
-  for (const result of settled) {
-    if (result.status === "rejected") {
-      logger.warn("Dedup check failed, will attempt to process post", {
-        sourceType: SOURCE_TYPE,
-        error: result.reason instanceof Error ? result.reason.message : String(result.reason),
-      });
-    } else if (!result.value.processed) {
-      newPostLinks.push(result.value.postLink);
-    }
-  }
+  const newPostLinks: PostLink[] = deduped
+    .filter((r) => !r.processed)
+    .map((r) => r.postLink);
 
   const skipped = postLinks.length - newPostLinks.length;
 

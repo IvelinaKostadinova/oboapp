@@ -71,6 +71,18 @@ export function parseFeedItems(xml: string): PostLink[] {
 
     if (!title || !url || !date) continue;
 
+    // Validate URL stays on the expected host to avoid navigating to arbitrary sites.
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      continue;
+    }
+    if (parsedUrl.hostname !== "www.sofia.bg") continue;
+
+    // Validate date is parseable before accepting the item.
+    if (isNaN(Date.parse(date))) continue;
+
     postLinks.push({ url, title, date });
   }
 
