@@ -45,17 +45,17 @@ export async function crawl(): Promise<void> {
     return;
   }
 
-  logger.info("Fetched post list", {
-    sourceType: SOURCE_TYPE,
-    count: postLinks.length,
-  });
-
   // Deduplicate by URL in case the feed contains duplicate entries.
   const seen = new Set<string>();
   postLinks = postLinks.filter((p) => {
     if (seen.has(p.url)) return false;
     seen.add(p.url);
     return true;
+  });
+
+  logger.info("Fetched post list", {
+    sourceType: SOURCE_TYPE,
+    count: postLinks.length,
   });
 
   // Build a set of titles already stored for this source type.

@@ -2,21 +2,12 @@ import type { Page } from "playwright";
 import type { PostLink } from "./types";
 import { SELECTORS } from "./selectors";
 import { extractPostDetailsGeneric } from "../shared/extractors";
+import { decode as decodeHtmlEntities } from "html-entities";
 
 export const FEED_FETCH_TIMEOUT_MS = 30_000;
 
 function stripCdata(text: string): string {
   return text.replace(/^<!\[CDATA\[([\s\S]*?)]]>$/, "$1");
-}
-
-function decodeHtmlEntities(text: string): string {
-  return text
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&#39;/g, "'");
 }
 
 /**
