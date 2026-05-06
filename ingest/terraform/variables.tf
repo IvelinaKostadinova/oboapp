@@ -9,6 +9,24 @@ variable "region" {
   default     = "europe-west1"
 }
 
+variable "localities" {
+  description = "List of locality IDs whose crawlers should be deployed (e.g. [\"bg.sofia\"]). Each ID must have a corresponding crawlers.\u003clocality-id\u003e.tf file (e.g. \"bg.sofia\" \u2192 crawlers.bg.sofia.tf) wired into crawlers.tf. Crawlers for all listed localities are merged into a single Cloud Run job set. Note: all crawler jobs currently share the same var.locality execution context; per-job locality scoping is planned."
+  type        = list(string)
+  default     = ["bg.sofia"]
+}
+
+variable "crawlers" {
+  description = "Full manual override for the crawler map. When non-empty, bypasses the per-locality assembly entirely. Useful for one-off deployments or testing a single crawler without editing locality files."
+  type = map(object({
+    source      = string
+    memory      = optional(string, "1Gi")
+    timeout     = optional(string, "1800s")
+    description = optional(string, "")
+    emergent    = optional(bool, false)
+  }))
+  default = {}
+}
+
 variable "image_registry" {
   description = "Container image registry"
   type        = string
@@ -91,4 +109,14 @@ variable "gcs_generic_bucket" {
     condition     = var.gcs_generic_bucket == "" || length(var.gcs_generic_bucket) > 3
     error_message = "gcs_generic_bucket must be empty (disabled) or a valid GCS bucket name (>3 chars)."
   }
+}
+variable "app_url" {
+  description = "Public URL of the web app, used in notification links (e.g. https://oboapp.online)"
+  type        = string
+}
+
+variable "artifact_registry_repo_id" {
+  description = "Artifact Registry repository ID for the ingest Docker image"
+  type        = string
+  default     = "oborishte-ingest"
 }

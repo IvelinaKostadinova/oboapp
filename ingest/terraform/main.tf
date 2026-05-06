@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.0"
+  required_version = ">= 1.5"
   
   required_providers {
     google = {
@@ -75,8 +75,8 @@ resource "google_project_service" "artifactregistry" {
 # Create a new Artifact Registry repository with cleanup policies
 resource "google_artifact_registry_repository" "ingest" {
   location      = var.region
-  repository_id = "oborishte-ingest"
-  description   = "Docker repository for oborishte-ingest container images with automatic cleanup"
+  repository_id = var.artifact_registry_repo_id
+  description   = "Docker repository for ${var.artifact_registry_repo_id} container images with automatic cleanup"
   format        = "DOCKER"
 
   cleanup_policies {
@@ -245,154 +245,6 @@ resource "google_workflows_workflow" "pipeline_all" {
 
 # ── Cloud Run Jobs ────────────────────────────────────────────────────────────
 
-# Cloud Run Jobs
-locals {
-  crawlers = {
-    rayon-oborishte = {
-      source       = "rayon-oborishte-bg"
-      memory       = "1Gi"
-      timeout      = "1800s"
-      description  = "Crawl Rayon Oborishte website"
-    }
-    sofia = {
-      source       = "sofia-bg"
-      memory       = "1Gi"
-      timeout      = "1800s"
-      description  = "Crawl Sofia municipality"
-    }
-    sofiyska-voda = {
-      source       = "sofiyska-voda"
-      memory       = "512Mi"
-      timeout      = "1800s"
-      description  = "Crawl Sofiyska Voda"
-      emergent     = true
-    }
-    toplo = {
-      source       = "toplo-bg"
-      memory       = "512Mi"
-      timeout      = "1800s"
-      description  = "Crawl Toplo BG"
-      emergent     = true
-    }
-    erm-zapad = {
-      source       = "erm-zapad"
-      memory       = "512Mi"
-      timeout      = "1800s"
-      description  = "Crawl ERM-Zapad power outages"
-      emergent     = true
-    }
-    mladost = {
-      source       = "mladost-bg"
-      memory       = "1Gi"
-      timeout      = "1800s"
-      description  = "Crawl Mladost district"
-    }
-    studentski = {
-      source       = "studentski-bg"
-      memory       = "1Gi"
-      timeout      = "1800s"
-      description  = "Crawl Studentski district"
-    }
-    sredec = {
-      source       = "sredec-sofia-org"
-      memory       = "1Gi"
-      timeout      = "1800s"
-      description  = "Crawl Sredec district"
-    }
-    serdika = {
-      source       = "serdika-egov-bg"
-      memory       = "1Gi"
-      timeout      = "1800s"
-      description  = "Crawl Serdika district"
-    }
-    slatina = {
-      source       = "so-slatina-org"
-      memory       = "1Gi"
-      timeout      = "1800s"
-      description  = "Crawl Slatina district"
-    }
-    lozenets = {
-      source       = "lozenets-sofia-bg"
-      memory       = "1Gi"
-      timeout      = "1800s"
-      description  = "Crawl Lozenets district"
-    }
-    raioniskar = {
-      source       = "raioniskar-bg"
-      memory       = "1Gi"
-      timeout      = "1800s"
-      description  = "Crawl Raion Iskar website"
-    }
-    rayon-pancharevo = {
-      source       = "rayon-pancharevo-bg"
-      memory       = "1Gi"
-      timeout      = "1800s"
-      description  = "Crawl Rayon Pancharevo website"
-    }
-    rayon-ilinden = {
-      source       = "rayon-ilinden-bg"
-      memory       = "1Gi"
-      timeout      = "1800s"
-      description  = "Crawl Rayon Ilinden website"
-    }
-    triaditsa = {
-      source       = "triaditsa-org"
-      memory       = "1Gi"
-      timeout      = "1800s"
-      description  = "Crawl Triaditsa district website"
-    }
-    krasna-polyana = {
-      source       = "krasna-polyana-org"
-      memory       = "1Gi"
-      timeout      = "1800s"
-      description  = "Crawl Krasna Polyana district website"
-    }
-    vrabnitsa = {
-      source       = "vrabnitsa-org"
-      memory       = "1Gi"
-      timeout      = "1800s"
-      description  = "Crawl Vrabnitsa district website"
-    }
-    nadezhda = {
-      source       = "nadezhda-org"
-      memory       = "1Gi"
-      timeout      = "1800s"
-      description  = "Crawl Nadezhda district website"
-    }
-    inspectorat-so = {
-      source       = "inspectorat-so-org"
-      memory       = "1Gi"
-      timeout      = "1800s"
-      description  = "Crawl Stolichen inspektorat news"
-    }
-    nimh-severe-weather = {
-      source       = "nimh-severe-weather"
-      memory       = "512Mi"
-      timeout      = "1800s"
-      description  = "Crawl NIMH severe weather warnings"
-    }
-    sensor-community = {
-      source       = "sensor-community"
-      memory       = "512Mi"
-      timeout      = "600s"
-      description  = "Evaluate sensor.community air quality data"
-      emergent     = true
-    }
-    sofia-capital-of-sport = {
-      source       = "sofia-capital-of-sport"
-      memory       = "1Gi"
-      timeout      = "1800s"
-      description  = "Crawl Sofia Capital of Sport events"
-    }
-    sdvr-mvr = {
-      source       = "sdvr-mvr-bg"
-      memory       = "1Gi"
-      timeout      = "1800s"
-      description  = "Crawl SDVR news"
-    }
-  }
-}
-
 resource "google_cloud_run_v2_job" "crawlers" {
   for_each = local.crawlers
   
@@ -469,11 +321,16 @@ resource "google_cloud_run_v2_job" "crawlers" {
         
         env {
           name  = "APP_URL"
-          value = "https://oboapp.online"
+          value = var.app_url
         }
         
         env {
           name  = "LOCALITY"
+          # NOTE: All crawler jobs currently share the same var.locality execution
+          # context. var.localities assembles the full set of crawler Cloud Run jobs;
+          # per-job locality scoping (passing each crawler its own locality ID) is
+          # planned — at that point crawlers will accept localities as a runtime
+          # parameter rather than reading a single env var.
           value = var.locality
         }
         
@@ -594,7 +451,7 @@ resource "google_cloud_run_v2_job" "ingest" {
         
         env {
           name  = "APP_URL"
-          value = "https://oboapp.online"
+          value = var.app_url
         }
         
         env {
@@ -704,7 +561,7 @@ resource "google_cloud_run_v2_job" "notify" {
         
         env {
           name  = "APP_URL"
-          value = "https://oboapp.online"
+          value = var.app_url
         }
         
         env {
@@ -816,7 +673,7 @@ resource "google_cloud_run_v2_job" "pipeline_emergent" {
         
         env {
           name  = "APP_URL"
-          value = "https://oboapp.online"
+          value = var.app_url
         }
         
         env {
@@ -926,7 +783,7 @@ resource "google_cloud_run_v2_job" "pipeline_all" {
         
         env {
           name  = "APP_URL"
-          value = "https://oboapp.online"
+          value = var.app_url
         }
         
         env {
