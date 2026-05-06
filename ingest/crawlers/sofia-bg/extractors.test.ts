@@ -155,7 +155,7 @@ describe("sofia-bg/extractors", () => {
       expect(items[0].url).toBe(
         "https://www.sofia.bg/repairs-and-traffic-changes/-/asset_publisher/utdu/content/id/12345",
       );
-      expect(items[0].date).toBe("2026-05-01T07:00:00Z");
+      expect(items[0].date).toBe("2026-05-01T07:00:00.000Z");
     });
 
     it("should decode HTML entities in title", () => {
@@ -256,6 +256,19 @@ describe("sofia-bg/extractors", () => {
         ),
       );
       expect(parseFeedItems(xml)).toHaveLength(0);
+    });
+
+    it("should normalize timezone-offset dates to UTC ISO 8601", () => {
+      const xml = wrapInChannel(
+        buildItemXml(
+          "Sofia Event",
+          "https://www.sofia.bg/repairs-and-traffic-changes/-/asset_publisher/utdu/content/id/1",
+          "2026-05-01T10:00:00+03:00",
+        ),
+      );
+      const items = parseFeedItems(xml);
+      expect(items).toHaveLength(1);
+      expect(items[0].date).toBe("2026-05-01T07:00:00.000Z");
     });
   });
 

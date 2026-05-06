@@ -73,10 +73,11 @@ export function parseFeedItems(xml: string): PostLink[] {
     }
     if (parsedUrl.hostname !== "www.sofia.bg") continue;
 
-    // Validate date is parseable before accepting the item.
-    if (isNaN(Date.parse(date))) continue;
+    // Validate date is parseable and normalize to canonical UTC ISO 8601.
+    const dateMs = Date.parse(date);
+    if (isNaN(dateMs)) continue;
 
-    postLinks.push({ url, title, date });
+    postLinks.push({ url, title, date: new Date(dateMs).toISOString() });
   }
 
   return postLinks;
