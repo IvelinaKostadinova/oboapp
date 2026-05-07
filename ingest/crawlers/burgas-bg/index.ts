@@ -10,6 +10,7 @@ import {
   crawlWordpressPage,
   processWordpressPost,
 } from "../shared/webpage-crawlers";
+import { BULGARIAN_MONTH_TO_NUMBER } from "../shared/date-utils";
 import { logger } from "@/lib/logger";
 
 dotenv.config({ path: resolve(process.cwd(), ".env.local") });
@@ -18,24 +19,6 @@ const INDEX_URL = "https://www.burgas.bg/bg/novini";
 const SOURCE_TYPE = "burgas-bg";
 const LOCALITY = "bg.burgas";
 const DELAY_BETWEEN_REQUESTS = 2000; // 2 seconds
-
-/**
- * Full Bulgarian month names → zero-padded month number.
- */
-const BG_FULL_MONTH: Record<string, string> = {
-  януари: "01",
-  февруари: "02",
-  март: "03",
-  април: "04",
-  май: "05",
-  юни: "06",
-  юли: "07",
-  август: "08",
-  септември: "09",
-  октомври: "10",
-  ноември: "11",
-  декември: "12",
-};
 
 /**
  * Parse a burgas.bg date string to ISO format.
@@ -55,8 +38,9 @@ export function parseBurgasDate(dateText: string, fallback?: string): string {
   const bgMatch = text.match(/(\d{1,2})\s+([а-яА-Я]+)\s+(\d{4})/);
   if (bgMatch) {
     const [, day, monthName, year] = bgMatch;
-    const month = BG_FULL_MONTH[monthName.toLowerCase()];
-    if (month) {
+    const monthNum = BULGARIAN_MONTH_TO_NUMBER[monthName.toLowerCase()];
+    if (monthNum) {
+      const month = monthNum.toString().padStart(2, "0");
       const d = day.padStart(2, "0");
       const parsed = new Date(`${year}-${month}-${d}T00:00:00+02:00`);
       if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();

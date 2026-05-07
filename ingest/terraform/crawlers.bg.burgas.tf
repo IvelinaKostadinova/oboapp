@@ -10,5 +10,11 @@ locals {
       timeout     = "1800s"
       description = "Crawl Burgas municipality news"
     }
+    burgas-org = {
+      source      = "burgas-org"
+      memory      = "1Gi"
+      timeout     = "1800s"
+      description = "Crawl Burgas municipality announcements and programmes"
+    }
   }
 }
