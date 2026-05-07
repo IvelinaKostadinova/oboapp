@@ -29,7 +29,11 @@ const DELAY_BETWEEN_REQUESTS = 2000; // 2 seconds
  *      → extract "18 Април 2026" with a regex
  *   2. Index page <time datetime="…"> attribute (fallback):
  *      "2026-04-17 11:02:07"
- *      → parse as ISO-like datetime in Europe/Sofia timezone
+ *      → parse as a local-time value (requires process TZ=Europe/Sofia)
+ *
+ * NOTE: Both shapes use `new Date(year, month, day, …)` which interprets
+ * values in the process' local timezone. The ingest container must run with
+ * TZ=Europe/Sofia for correct results.
  */
 export function parseBurgasDate(dateText: string, fallback?: string): string {
   const text = dateText.replace(/\s+/g, " ").trim();

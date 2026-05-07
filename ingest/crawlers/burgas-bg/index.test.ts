@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { parseBurgasDate } from "./index";
+import { logger } from "@/lib/logger";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -88,7 +89,7 @@ describe("burgas-bg/parseBurgasDate", () => {
 
   describe("fallback to current date on invalid input", () => {
     it("returns current date and warns when both inputs are unparseable", () => {
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
       const before = Date.now();
       const result = parseBurgasDate("не е дата", "не е дата");
       const after = Date.now();
@@ -96,6 +97,7 @@ describe("burgas-bg/parseBurgasDate", () => {
       const ts = new Date(result).getTime();
       expect(ts).toBeGreaterThanOrEqual(before);
       expect(ts).toBeLessThanOrEqual(after);
+      expect(warnSpy).toHaveBeenCalledOnce();
 
       warnSpy.mockRestore();
     });

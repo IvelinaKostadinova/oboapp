@@ -82,6 +82,7 @@ COPY --from=builder /app/ingest/crawlers ./ingest/crawlers
 COPY --from=builder /app/ingest/localities ./ingest/localities
 
 ENV NODE_ENV=production
+ENV TZ=Europe/Sofia
 ENV PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright
 
 WORKDIR /app/ingest
