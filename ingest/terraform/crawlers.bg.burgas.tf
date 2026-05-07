@@ -14,7 +14,7 @@ locals {
       source      = "burgas-org"
       memory      = "1Gi"
       timeout     = "1800s"
-      description = "Crawl Burgas municipality announcements and programmes"
+      description = "Crawl Burgas municipality announcements and programmes for disruption-relevant posts"
     }
   }
 }

@@ -60,6 +60,9 @@ function isRelevantPost(post: PostLink): boolean {
 }
 
 export async function extractPostLinks(page: Page): Promise<PostLink[]> {
+  // Cast a wide allowlist (news, announcements, cultural/sports programmes) then
+  // narrow to disruption-relevant posts using RELEVANT_KEYWORDS, because
+  // infrastructure notices often appear across multiple Burgas sections.
   const posts = await extractPostLinksShared(
     page,
     SELECTORS,
