@@ -25,6 +25,7 @@ export type { SourceDefinition } from "./source-definition";
 import sofiaBg from "./sources/sofia-bg";
 import sofiyskavoda from "./sources/sofiyska-voda";
 import sensorCommunity from "./sources/sensor-community";
+import burgasBg from "./sources/burgas-bg";
 
 // ─── Instance assembly ────────────────────────────────────────────────────────
 // This is the list of sources active for this instance.
@@ -33,6 +34,7 @@ export const SOURCES = [
   sofiaBg, // regular crawler (3× daily)
   sofiyskavoda, // emergent: true  → runs every 30 minutes
   sensorCommunity, // emergent: true, experimental: true
+  burgasBg, // regular crawler (3× daily)
 ] as const;
 
 /**
