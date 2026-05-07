@@ -32,6 +32,9 @@ const RELEVANT_KEYWORDS = [
   "инфраструктур",
 ] as const;
 
+// NOTE: The construction section index at /bg/novini-stroitelstvo is crawled,
+// but its posts are permalinked under /bg/novini/ — not /bg/novini-stroitelstvo/.
+// Only pagination links (…/page/N) carry the /bg/novini-stroitelstvo/ path.
 const ALLOWED_SECTION_PATHS = [
   "/bg/novini/",
   "/bg/obyavi-i-saobshteniya/",

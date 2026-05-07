@@ -81,6 +81,24 @@ describe("burgas-org/extractors", () => {
       expect(posts).toEqual([]);
     });
 
+    it("includes construction-section posts whose permalinks fall under /bg/novini/", async () => {
+      // Posts on the /bg/novini-stroitelstvo index are permalinked under /bg/novini/,
+      // not /bg/novini-stroitelstvo/. This test asserts they pass the allowlist filter.
+      const mockEvaluate = vi.fn().mockResolvedValue([
+        {
+          url: "https://www.burgas.bg/bg/novini/remontat-pred-zhp-garata-prodalzhava-i-utre",
+          title: "Ремонтът пред ЖП гарата продължава и утре",
+          date: "Четвъртък, 01 Май 2026",
+        },
+      ]);
+
+      const page = createMockPage(mockEvaluate) as any;
+      const posts = await extractPostLinks(page);
+
+      expect(posts).toHaveLength(1);
+      expect(posts[0].url).toContain("/bg/novini/");
+    });
+
     it("returns an empty list when no relevant posts are found", async () => {
       const mockEvaluate = vi.fn().mockResolvedValue([
         {
