@@ -40,9 +40,12 @@ export function parseBurgasDate(dateText: string, fallback?: string): string {
     const [, day, monthName, year] = bgMatch;
     const monthNum = BULGARIAN_MONTH_TO_NUMBER[monthName.toLowerCase()];
     if (monthNum) {
-      const month = monthNum.toString().padStart(2, "0");
-      const d = day.padStart(2, "0");
-      const parsed = new Date(`${year}-${month}-${d}T00:00:00+02:00`);
+      const parsed = new Date(
+        Number.parseInt(year, 10),
+        monthNum - 1,
+        Number.parseInt(day, 10),
+        0, 0, 0, 0,
+      );
       if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
     }
   }
@@ -50,9 +53,17 @@ export function parseBurgasDate(dateText: string, fallback?: string): string {
   // Shape 2: ISO-like fallback from <time datetime> attribute.
   const fallbackText = (fallback ?? "").trim();
   if (fallbackText) {
-    const isoMatch = fallbackText.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})/);
+    const isoMatch = fallbackText.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})/);
     if (isoMatch) {
-      const parsed = new Date(`${isoMatch[1]}T${isoMatch[2]}+02:00`);
+      const parsed = new Date(
+        Number.parseInt(isoMatch[1], 10),
+        Number.parseInt(isoMatch[2], 10) - 1,
+        Number.parseInt(isoMatch[3], 10),
+        Number.parseInt(isoMatch[4], 10),
+        Number.parseInt(isoMatch[5], 10),
+        Number.parseInt(isoMatch[6], 10),
+        0,
+      );
       if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
     }
   }
