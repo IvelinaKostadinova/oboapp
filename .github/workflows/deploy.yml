@@ -9,8 +9,8 @@ env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
   FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
   ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
-  LOCALITY: ${{ vars.LOCALITY || 'bg.sofia' }}
-  LOCALITIES: ${{ vars.LOCALITIES || '["bg.sofia"]' }}
+  LOCALITY: ${{ vars.LOCALITY || 'bg.burgas' }}
+  LOCALITIES: ${{ vars.LOCALITIES || '["bg.burgas"]' }}
   GCS_GENERIC_BUCKET: ${{ vars.GCS_GENERIC_BUCKET || '' }}
   APP_URL: ${{ vars.APP_URL }}
   SENTRY_DSN_SECRET_ID: ${{ vars.SENTRY_DSN_SECRET_ID || 'sentry-dsn' }}

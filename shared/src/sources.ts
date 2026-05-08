@@ -9,35 +9,13 @@ export type { SourceDefinition } from "./source-definition";
 //   3. Add any city-specific sources that live only in your fork.
 //
 // See docs/setup/new-locality-instance.md for the full guide.
-import rayonOborishte from "./sources/rayon-oborishte-bg";
-import sofiyskavoda from "./sources/sofiyska-voda";
-import toploBg from "./sources/toplo-bg";
-import sofiaBg from "./sources/sofia-bg";
-import ermZapad from "./sources/erm-zapad";
-import mladostBg from "./sources/mladost-bg";
-import studentskiBg from "./sources/studentski-bg";
-import sredecSofiaOrg from "./sources/sredec-sofia-org";
-import soSlatinaOrg from "./sources/so-slatina-org";
-import nimhSevereWeather from "./sources/nimh-severe-weather";
-import lozenets from "./sources/lozenets-sofia-bg";
-import raioniskarBg from "./sources/raioniskar-bg";
-import rayonPancharevo from "./sources/rayon-pancharevo-bg";
-import rayonIlinden from "./sources/rayon-ilinden-bg";
-import triaditsaOrg from "./sources/triaditsa-org";
-import krasnaPolyanaOrg from "./sources/krasna-polyana-org";
-import vrabnitsa from "./sources/vrabnitsa-org";
-import nadezhda from "./sources/nadezhda-org";
-import inspectoratSo from "./sources/inspectorat-so-org";
-import sensorCommunity from "./sources/sensor-community";
+// ─────────────────────────────────────────────────────────────────────────────
 import burgasBg from "./sources/burgas-bg";
 import burgasOrg from "./sources/burgas-org";
 
 export const SOURCES = [
-  sofiaBg, // regular crawler (3× daily)
-  sofiyskavoda, // emergent: true  → runs every 30 minutes
-  sensorCommunity, // emergent: true, experimental: true
-  burgasBg, // regular crawler (3× daily)
-  burgasOrg, // regular crawler (3× daily)
+  burgasBg,
+  burgasOrg,
 ] as const;
 
 /**
