@@ -130,7 +130,6 @@ export async function crawlWordpressPage(options: {
   ) => Promise<void>;
   delayBetweenRequests?: number;
   waitUntil?: "load" | "domcontentloaded" | "networkidle";
-  browser?: Browser;
 }): Promise<void> {
   const {
     indexUrl,
@@ -139,7 +138,40 @@ export async function crawlWordpressPage(options: {
     processPost,
     delayBetweenRequests: _delayBetweenRequests = 2000,
     waitUntil,
-    browser: providedBrowser,
+  } = options;
+
+  await crawlWordpressPages({
+    indexUrls: [indexUrl],
+    sourceType,
+    extractPostLinks,
+    processPost,
+    delayBetweenRequests: _delayBetweenRequests,
+    waitUntil,
+  });
+}
+
+/**
+ * Crawl multiple WordPress-style index pages while reusing a single browser/db session
+ */
+export async function crawlWordpressPages(options: {
+  indexUrls: readonly string[];
+  sourceType: string;
+  extractPostLinks: (page: Page) => Promise<PostLink[]>;
+  processPost: (
+    browser: Browser,
+    postLink: PostLink,
+    db: OboDb,
+  ) => Promise<void>;
+  delayBetweenRequests?: number;
+  waitUntil?: "load" | "domcontentloaded" | "networkidle";
+}): Promise<void> {
+  const {
+    indexUrls,
+    sourceType,
+    extractPostLinks,
+    processPost,
+    delayBetweenRequests = 2000,
+    waitUntil = "networkidle",
   } = options;
 
   logger.info("Starting crawler", { sourceType });
@@ -148,50 +180,85 @@ export async function crawlWordpressPage(options: {
   const db = await getDb();
 
   let browser: Browser | null = null;
-  const ownsBrowser = !providedBrowser;
 
   try {
-    browser = providedBrowser ?? (await launchBrowser());
-
-    const page = await browser.newPage();
-    logger.debug("Fetching index page", { sourceType, url: indexUrl });
-    await page.goto(indexUrl, { waitUntil: waitUntil ?? "networkidle" });
-
-    const postLinks = await extractPostLinks(page);
-    await page.close();
-
-    if (postLinks.length === 0) {
-      logger.warn("No posts found on index page", { sourceType });
-      return;
-    }
+    browser = await launchBrowser();
 
     let savedCount = 0;
     let skippedCount = 0;
     let failedCount = 0;
+    let failedIndexCount = 0;
+    let totalCount = 0;
 
-    for (const postLink of postLinks) {
+    let isFirstIndex = true;
+    for (const indexUrl of indexUrls) {
+      if (!isFirstIndex) {
+        await delay(delayBetweenRequests);
+      }
+      isFirstIndex = false;
+
+      let postLinks: PostLink[] = [];
+
       try {
-        const wasProcessed = await isUrlProcessed(postLink.url, db);
+        const page = await browser.newPage();
+        logger.debug("Fetching index page", { sourceType, url: indexUrl });
 
-        if (wasProcessed) {
-          skippedCount++;
-          logger.debug("Skipped already processed post", { sourceType, title: postLink.title.substring(0, 60) });
-        } else {
-          await processPost(browser, postLink, db);
-          savedCount++;
-        }
+        postLinks = await (async () => {
+          try {
+            await page.goto(indexUrl, { waitUntil });
+            return await extractPostLinks(page);
+          } finally {
+            await page.close();
+          }
+        })();
       } catch (error) {
-        failedCount++;
-        logger.error("Error processing post", { sourceType, url: postLink.url, error: error instanceof Error ? error.message : String(error) });
+        failedIndexCount++;
+        logger.error("Error processing index page", {
+          sourceType,
+          url: indexUrl,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        continue;
+      }
+
+      if (postLinks.length === 0) {
+        logger.warn("No posts found on index page", { sourceType, url: indexUrl });
+        continue;
+      }
+
+      totalCount += postLinks.length;
+
+      for (const postLink of postLinks) {
+        try {
+          const wasProcessed = await isUrlProcessed(postLink.url, db);
+
+          if (wasProcessed) {
+            skippedCount++;
+            logger.debug("Skipped already processed post", { sourceType, title: postLink.title.substring(0, 60) });
+          } else {
+            await processPost(browser, postLink, db);
+            savedCount++;
+          }
+        } catch (error) {
+          failedCount++;
+          logger.error("Error processing post", { sourceType, url: postLink.url, error: error instanceof Error ? error.message : String(error) });
+        }
       }
     }
 
-    logger.info("Crawl complete", { sourceType, total: postLinks.length, saved: savedCount, skipped: skippedCount, failed: failedCount });
+    logger.info("Crawl complete", {
+      sourceType,
+      total: totalCount,
+      saved: savedCount,
+      skipped: skippedCount,
+      failed: failedCount,
+      failedIndexes: failedIndexCount,
+    });
   } catch (error) {
     logger.error("Crawl failed", { sourceType, error: error instanceof Error ? error.message : String(error) });
     throw error;
   } finally {
-    if (ownsBrowser && browser) {
+    if (browser) {
       await browser.close();
     }
   }

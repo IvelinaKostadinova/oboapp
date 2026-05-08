@@ -1,6 +1,6 @@
 import { logger } from "@/lib/logger";
 
-const BULGARIAN_MONTH_TO_NUMBER: Record<string, number> = {
+export const BULGARIAN_MONTH_TO_NUMBER: Record<string, number> = {
   януари: 1,
   февруари: 2,
   март: 3,

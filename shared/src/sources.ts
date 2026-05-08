@@ -29,34 +29,15 @@ import vrabnitsa from "./sources/vrabnitsa-org";
 import nadezhda from "./sources/nadezhda-org";
 import inspectoratSo from "./sources/inspectorat-so-org";
 import sensorCommunity from "./sources/sensor-community";
-import sofiaCapitalOfSport from "./sources/sofia-capital-of-sport";
-import serdikaEgovBg from "./sources/serdika-egov-bg";
-import sdvrMvrBg from "./sources/sdvr-mvr-bg";
+import burgasBg from "./sources/burgas-bg";
+import burgasOrg from "./sources/burgas-org";
 
 export const SOURCES = [
-  rayonOborishte,
-  sofiyskavoda,
-  toploBg,
-  sofiaBg,
-  ermZapad,
-  mladostBg,
-  studentskiBg,
-  sredecSofiaOrg,
-  soSlatinaOrg,
-  nimhSevereWeather,
-  lozenets,
-  raioniskarBg,
-  rayonPancharevo,
-  rayonIlinden,
-  triaditsaOrg,
-  krasnaPolyanaOrg,
-  vrabnitsa,
-  nadezhda,
-  inspectoratSo,
-  sensorCommunity,
-  sofiaCapitalOfSport,
-  serdikaEgovBg,
-  sdvrMvrBg,
+  sofiaBg, // regular crawler (3× daily)
+  sofiyskavoda, // emergent: true  → runs every 30 minutes
+  sensorCommunity, // emergent: true, experimental: true
+  burgasBg, // regular crawler (3× daily)
+  burgasOrg, // regular crawler (3× daily)
 ] as const;
 
 /**
